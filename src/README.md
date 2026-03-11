@@ -5,15 +5,17 @@ This repository is a python focused base for the Mario AI tool. All original cod
   http://julian.togelius.com/mariocompetition2009/
 
 ## Setup
-This project was prepared using Python 3.10. We recommend that you create a clean environment using Anaconda. To do so, open a terminal and type:
+Create a Python environment:
 
-conda create -n NIAI python=3.10
-conda activate NIAI
+```
+python -m venv venv
+```
 
 Afterwards, navigate to the project folder and type
 
-python install_requirements.py
-
+```
+pip install -r requirements.txt
+```
 
 ## Getting Started
 
