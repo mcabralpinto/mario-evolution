@@ -1,11 +1,11 @@
 import torch
 import torch.nn as nn
 import numpy as np
-import marioai
+from marioai.task import Task
 
 
 
-class MoveForwardTask(marioai.Task):
+class MoveForwardTask(Task):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.name = "MoveForward"

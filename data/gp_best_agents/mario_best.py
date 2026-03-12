@@ -1,0 +1,7 @@
+
+# Evolved Mario Controller (Random Search)
+# Fitness: 0.0
+
+def corre(action, landscape, enemies, can_jump, on_ground, Mario, Sprite, **kwargs):
+    if can_jump:
+        action[Mario.KEY_RIGHT] = int(True)

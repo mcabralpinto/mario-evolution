@@ -1,4 +1,4 @@
-import marioai
+from marioai.experiment import Experiment
 from multiprocessing import Pool, Manager, current_process
 from itertools import cycle
 from agents import MLPAgent, CodeAgent
@@ -19,7 +19,7 @@ def evaluate_agent(agent, task, episodes=1):
     Evaluates the agent on the task for a given number of episodes.
     Returns the average fitness (reward).
     """
-    exp = marioai.Experiment(task, agent)
+    exp = Experiment(task, agent)
     # Speed up simulation for training
     exp.max_fps = -1 
     

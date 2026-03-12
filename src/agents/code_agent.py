@@ -1,5 +1,5 @@
 import numpy as np
-import marioai
+from marioai.agent import Agent
 from enum import IntEnum
 
 class Mario(IntEnum):
@@ -20,7 +20,7 @@ class Sprite(IntEnum):
     KIND_SPIKY = 9
     KIND_SPIKY_WINGED = 10
 
-class CodeAgent(marioai.Agent):
+class CodeAgent(Agent):
     def __init__(self):
         super(CodeAgent, self).__init__()
         self._action_function = None
