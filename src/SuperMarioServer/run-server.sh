@@ -1,5 +1,5 @@
 #!/bin/bash
-cd /server
+cd server
 # Wait 5 seconds to ensure the display is fully ready
 sleep 5
 # Loop through ports 4242 to 4252
