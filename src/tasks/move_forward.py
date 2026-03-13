@@ -3,13 +3,10 @@ import torch.nn as nn
 import numpy as np
 from marioai.task import Task
 
-
-
 class MoveForwardTask(Task):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.name = "MoveForward"
-
 
     def compute_reward(self, current_obs, last_obs):
         """
@@ -29,8 +26,14 @@ class MoveForwardTask(Task):
           system that aligns with the objectives of the project.
         - Consider the balance between encouraging progress, rewarding kills, and penalizing 
           undesirable behaviors (e.g., cowardice or reckless actions).
+
+        Computes the reward for MoveForward task.
+        Reward is the distance covered since the last observation.
         """
+        if last_obs is None:
+            return 0
         
-        reward = 0
+        # Reward for moving forward (delta distance)
+        reward = current_obs.distance - last_obs.distance
         
         return reward

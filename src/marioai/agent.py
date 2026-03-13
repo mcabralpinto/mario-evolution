@@ -26,7 +26,7 @@ class Agent(object):
     def reset(self):
         '''New episode.'''
 
-        self.episode_over = False;
+        self.episode_over = False
 
     def sense(self, obs):
         '''Receive sense.'''

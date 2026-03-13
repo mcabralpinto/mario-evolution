@@ -158,7 +158,7 @@ class TCPClient(object):
         self.host = host
         self.port = port
         self.sock = None
-        self.connected = False;
+        self.connected = False
         self.buffer_size = 4096
 
     def __del__(self):
@@ -187,7 +187,7 @@ class TCPClient(object):
         message = 'Client: Dear Server, hello! I am %s\r\n'%self.name
         self.sendData(message)
 
-        self.connected = True;
+        self.connected = True
 
     def disconnect(self):
         '''Disconnects from the server.'''

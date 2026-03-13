@@ -5,10 +5,11 @@ import sys
 import textwrap
 import pickle
 import copy
+import argparse
 from pathlib import Path
 
 # USER IMPORTS (Assuming evaluate is provided in your evaluation.py)
-from evaluation import evaluate
+from evaluation import evaluate, evaluate_population
 
 # -----------------------------------------------------------------------------
 # USER IMPORTS / MOCKS
@@ -83,7 +84,7 @@ class Key: pass
 class Bool: pass
 
 # -----------------------------------------------------------------------------
-# 2. PRIMITIVES: STRING BUILDERS (Stripped Down)
+# 2. PRIMITIVES: STRING BUILDERS
 # -----------------------------------------------------------------------------
 def str_if_then(cond, expr):
     return f"if {cond}:\n{indent(expr)}"
@@ -94,8 +95,17 @@ def str_sequence(expr1, expr2):
 def str_set_action(key, val):
     return f"action[{key}] = int({val})"
 
+def str_and(cond1, cond2):
+    return f"({cond1} and {cond2})"
+
+def str_or(cond1, cond2):
+    return f"({cond1} or {cond2})"
+
+def str_not(cond):
+    return f"(not {cond})"
+
 # -----------------------------------------------------------------------------
-# 3. GRAMMAR CONFIGURATION (Bare Minimum)
+# 3. GRAMMAR CONFIGURATION
 # -----------------------------------------------------------------------------
 pset = gp.PrimitiveSetTyped("MAIN", [], Expr)
 
@@ -105,16 +115,28 @@ pset.addPrimitive(str_sequence, [Expr, Expr], Expr)
 pset.addPrimitive(str_set_action, [Key, Bool], Expr)
 pset.addTerminal("pass", Expr, name="NoOp")
 
-# Basic Senses (Provided directly by the environment variables)
+# Boolean Logic
+pset.addPrimitive(str_and, [Condition, Condition], Condition, name="AND")
+pset.addPrimitive(str_or, [Condition, Condition], Condition, name="OR")
+pset.addPrimitive(str_not, [Condition], Condition, name="NOT")
+
+# Senses (Mapped to variables in corre function)
 pset.addTerminal("on_ground", Condition, name="IsMarioOnGround")
 pset.addTerminal("can_jump", Condition, name="MayMarioJump")
+pset.addTerminal("enemy_near", Condition, name="EnemyNear")
+pset.addTerminal("obstacle_ahead", Condition, name="ObstacleAhead")
+pset.addTerminal("hole_ahead", Condition, name="HoleAhead")
 
 # Constants
 pset.addTerminal("True", Bool)
+pset.addTerminal("False", Bool)
 
-# Limited Actions (Only Right and Jump)
+# Actions
 pset.addTerminal("Mario.KEY_RIGHT", Key, name="RIGHT")
+pset.addTerminal("Mario.KEY_LEFT", Key, name="LEFT")
 pset.addTerminal("Mario.KEY_JUMP", Key, name="JUMP")
+pset.addTerminal("Mario.KEY_SPEED", Key, name="SPEED")
+pset.addTerminal("Mario.KEY_DOWN", Key, name="DOWN")
 
 # -----------------------------------------------------------------------------
 # 4. RANDOM GENERATION SETUP
@@ -125,24 +147,33 @@ creator.create("Individual", gp.PrimitiveTree, fitness=creator.FitnessMax)
 toolbox = base.Toolbox()
 toolbox.register("expr", safe_gen_grow, pset=pset, min_=3, max_=6)
 toolbox.register("individual", tools.initIterate, creator.Individual, toolbox.expr)
+toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 toolbox.register("compile", gp.compile, pset=pset)
 
-def evaluate_gp_individual(individual):
-    """Converts a tree individual into Python code and evaluates it."""
+def compile_individual(individual):
+    """Converts a tree individual into Python code string."""
     code_body = toolbox.compile(individual)
-    agent_prototype = CodeAgent
     full_code_str = f"""
 def corre(action, landscape, enemies, can_jump, on_ground, Mario, Sprite, **kwargs):
+    # Process sensors (Heuristics)
+    enemy_near = any(abs(ex) < 30 and abs(ey) < 30 for ex, ey, ek in enemies)
+    obstacle_ahead = False
+    if landscape is not None:
+        # Check a few cells in front of Mario (11,11)
+        obstacle_ahead = (landscape[11, 12] != 0 or landscape[11, 13] != 0 or landscape[10, 12] != 0)
+    
+    hole_ahead = False
+    if landscape is not None:
+        # Check for floor gap
+        hole_ahead = True
+        for i in range(12, 16):
+            if landscape[i, 12] != 0:
+                hole_ahead = False
+                break
+
 {indent(code_body)}
-""" 
-    try:
-        reward = evaluate(agent_prototype, full_code_str)
-    except NameError:
-        # If your evaluation isn't loaded properly, mock a random score for testing
-        print(" [Sim] Evaluation not linked properly. Returning 0 score.")
-        reward = 0
-        
-    return reward
+"""
+    return full_code_str
 
 # -----------------------------------------------------------------------------
 # 5. PERSISTENCE HELPERS
@@ -171,43 +202,77 @@ def corre(action, landscape, enemies, can_jump, on_ground, Mario, Sprite, **kwar
     print(f"Saved executable code to '{filename_py}'")
 
 # -----------------------------------------------------------------------------
-# 6. MAIN EXECUTION: RANDOM SEARCH
+# 6. MAIN EXECUTION
 # -----------------------------------------------------------------------------
 if __name__ == "__main__":
-    random.seed(int(sys.argv[1]))
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--gen", type=int, default=10)
+    parser.add_argument("--pop", type=int, default=20)
+    args = parser.parse_args()
+
+    random.seed(args.seed)
     
-    NUM_ITERATIONS = 50  # Number of random agents to generate and test
-    
-    best_individual = None
-    best_fitness = -float('inf')
-    
-    print(f"Starting Random Search for {NUM_ITERATIONS} iterations...")
-    
-    for i in range(NUM_ITERATIONS):
-        print(f"\n--- Iteration {i+1}/{NUM_ITERATIONS} ---")
+    # Genetic Operators - experiment with these values! try elitism
+    toolbox.register("select", tools.selTournament, tournsize=3)
+    toolbox.register("mate", gp.cxOnePoint)
+    toolbox.register("expr_mut", safe_gen_grow, pset=pset, min_=0, max_=2) 
+    toolbox.register("mutate", gp.mutUniform, expr=toolbox.expr_mut, pset=pset)
+
+    # Decorators to limit tree height
+    toolbox.decorate("mate", gp.staticLimit(key=operator.attrgetter("height"), max_value=17)) # experiment with different ones!
+    toolbox.decorate("mutate", gp.staticLimit(key=operator.attrgetter("height"), max_value=17))
+
+    # Population Initialization
+    pop = toolbox.population(n=args.pop)
+    hof = tools.HallOfFame(1)
+
+    stats = tools.Statistics(lambda ind: ind.fitness.values)
+    stats.register("avg", np.mean)
+    stats.register("std", np.std)
+    stats.register("min", np.min)
+    stats.register("max", np.max)
+
+    # Evolutionary Algorithm
+    NGEN = args.gen
+    CXPB, MUTPB = 0.5, 0.2
+
+    print(f"Starting Evolution: {NGEN} generations, Population size {args.pop}")
+
+    for gen in range(NGEN):
+        print(f"\n--- Generation {gen} ---")
         
-        # 1: Generate a random individual
-        current_individual = toolbox.individual()
+        # Parallel evaluation
+        compiled_pop = [compile_individual(ind) for ind in pop]
+        fitnesses = evaluate_population(CodeAgent, compiled_pop)
         
-        # 2: Evaluate the generated individual
-        fitness_score = evaluate_gp_individual(current_individual)
+        for ind, fit in zip(pop, fitnesses):
+            ind.fitness.values = (fit,)
         
-        # 3: Assign the fitness score to the individual's DEAP fitness attribute
-        # DEAP requires fitness to be a tuple, so we add a comma
-        current_individual.fitness.values = (fitness_score,)
-        
-        print(f"Fitness Score: {fitness_score}")
-        
-        # 4: Compare this fitness to your `best_fitness`
-        if fitness_score > best_fitness:
-            best_fitness = fitness_score
-            # We copy the individual so later changes (if we had them) wouldn't affect our best
-            best_individual = copy.deepcopy(current_individual)
-            print(f">>> New Best Found! Score: {best_fitness}")
-            
-    if best_individual:
-        print(f"Final Best Fitness Found: {best_fitness}")
-        # 5: Save the best individual using the helper function
-        save_best_individual(best_individual, toolbox)
-    else:
-        print("No valid programs were found or evaluated.")
+        hof.update(pop)
+        record = stats.compile(pop)
+        print(f"Stats: {record}")
+
+        # Select the next generation individuals
+        offspring = toolbox.select(pop, len(pop))
+        offspring = list(map(toolbox.clone, offspring))
+
+        # Apply crossover and mutation
+        for child1, child2 in zip(offspring[::2], offspring[1::2]):
+            if random.random() < CXPB:
+                toolbox.mate(child1, child2)
+                del child1.fitness.values
+                del child2.fitness.values
+
+        for mutant in offspring:
+            if random.random() < MUTPB:
+                toolbox.mutate(mutant)
+                del mutant.fitness.values
+
+        # Replace population
+        pop[:] = offspring
+
+    # Final result
+    best_ind = hof[0]
+    print(f"\nBest Fitness Found: {best_ind.fitness.values[0]}")
+    save_best_individual(best_ind, toolbox, filename_py="gp_mario_best.py")
