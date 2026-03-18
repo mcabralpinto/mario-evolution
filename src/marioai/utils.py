@@ -172,11 +172,14 @@ def extractObservation(data):
 
         enemiesFloats = [ (enemiesFloats[i], enemiesFloats[i+1], enemiesFloats[i+2]) for i in range(0, len(enemiesFloats), 3) ]
         
+        distance = marioFloats[0]
+
         return Observation(may_jump=mayMarioJump, 
                            on_ground=isMarioOnGround, 
                            mario_pos=marioFloats, 
                            enemies=enemiesFloats, 
-                           level_scene=levelScene)
+                           level_scene=levelScene,
+                           distance=distance)
 
     else:
         # Fallback or error

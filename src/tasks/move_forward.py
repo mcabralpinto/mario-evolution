@@ -35,5 +35,8 @@ class MoveForwardTask(Task):
         
         # Reward for moving forward (delta distance)
         reward = current_obs.distance - last_obs.distance
+
+        if current_obs.on_ground and not last_obs.on_ground:
+            reward += 10
         
         return reward
