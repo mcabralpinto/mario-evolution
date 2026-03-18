@@ -142,7 +142,7 @@ pset = gp.PrimitiveSetTyped("MAIN", [], Expr)
 pset.addPrimitive(str_if_then, [Condition, Expr], Expr)
 pset.addPrimitive(str_sequence, [Expr, Expr], Expr)
 pset.addPrimitive(str_set_action, [Key, Bool], Expr)
-set.addTerminal("pass", Expr, name="NoOp")
+pset.addTerminal("pass", Expr, name="NoOp")
 
 # Boolean Logic
 pset.addPrimitive(str_and, [Condition, Condition], Condition, name="AND")
@@ -228,6 +228,7 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--gen", type=int, default=10)
     parser.add_argument("--pop", type=int, default=20)
+    parser.add_argument("--max_height", type=int, default=17)
     parser.add_argument(
         "--mode",
         choices=["evolution", "random"],
