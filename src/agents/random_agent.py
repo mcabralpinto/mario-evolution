@@ -1,5 +1,5 @@
 import random
-from marioai.agent import Agent
+from src.marioai.agent import Agent
 
 __all__ = ['RandomAgent']
 

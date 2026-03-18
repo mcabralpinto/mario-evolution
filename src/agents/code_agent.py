@@ -1,5 +1,5 @@
 import numpy as np
-from marioai.agent import Agent
+from src.marioai.agent import Agent
 from enum import IntEnum
 
 class Mario(IntEnum):
@@ -40,19 +40,11 @@ class CodeAgent(Agent):
 
     def sense(self, obs):
         super(CodeAgent, self).sense(obs)
-        
-        # obs is (mayMarioJump, isMarioOnGround, marioFloats, enemiesFloats, levelScene, dummy)
-        # But wait, `Agent.sense` unpacks it.
-        # self.can_jump
-        # self.on_ground
-        # self.mario_floats
-        # self.enemies_floats
-        # self.level_scene (numpy array 22x22)
         pass
 
     def act(self):
         action = [0,0,0,0,0]
-        if self.level_scene is not None:
+        if self.level_scene is not None and self._action_function is not None:
             context = {'action': action, 
                         'Mario' : Mario,
                         'Sprite' : Sprite, 
@@ -64,4 +56,3 @@ class CodeAgent(Agent):
             
             self._action_function(**context)
         return action
-

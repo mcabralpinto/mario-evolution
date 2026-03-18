@@ -101,64 +101,6 @@ def extractObservation(data):
                 levelScene[i, j] = int(parts[current_idx])
                 current_idx += 1
         
-        # Skip next ? (was k+=3 in original, but let's see)
-        # Original: k initialized to 0. 22*22 = 484 iterations.
-        # data[k+3] used. 
-        # After loop, k = 484.
-        # k += 3 -> k = 487.
-        # marioFloats at data[487], data[488].
-        
-        # In my index variable `current_idx`:
-        # Starts at 3. Ends at 3 + 484 = 487.
-        # So next item is indeed at 487?
-        # Original code did `k+=3` after loop.
-        # Why? maybe separating chars or something?
-        # Let's assume standard format: spaces between everything.
-        # If the loop consumed 484 tokens, we are at index 3+484 = 487.
-        # Original code: `k` was counting items read *from the grid*.
-        # `data[k+3]`. Last read was k=483 -> `data[486]`.
-        # Next index to read would be 487.
-        # But original code said `k += 3`. So k becomes 487.
-        # Access `data[487+3]` ?? No. `float(data[k])` where k is now 487?
-        # Wait, original:
-        # k=0. loop ... k=484.
-        # k+=3 -> k=487.
-        # floats = data[k], data[k+1] -> data[487], data[488].
-        # So yes, we skip 3 items?
-        # Actually, let's look at `extractObservation` original logic carefully.
-        # `k` was the loop counter for grid cells.
-        # `levelScene` filled from `data[k+3]`.
-        # After loop, k=484.
-        # `k += 3`. k=487.
-        # `marioFloats` from `data[487]`.
-        # This implies parts[487] is mario X.
-        # It implies parts[3] through parts[486] are the grid.
-        # This matches 484 items.
-        
-        # But what about the `k+=3` skip?
-        # Maybe the grid is followed by something else before Mario pos?
-        # Or maybe the data has some garbage?
-        # Let's perform `current_idx = 487` directly to be safe?
-        # No, `data` in original was split by ' '.
-        # So indices matter.
-        # Let's assume `current_idx` is now pointing to the item AFTER the grid.
-        # Which is 487.
-        # So if we mirror `k+=3`, we are skipping... wait.
-        # Original: `k` is just an offset relative to something? No, `data[k+3]`.
-        # If `k` goes from 0 to 483.
-        # `data[3]` ... `data[486]`.
-        # Then `k=487` refers to `data[487]`.
-        # So using `data[k]` requires `k` to supply the full index? No, `data` is the array.
-        # In the grid loop it was `data[k+3]`.
-        # In the float section it is `data[k]`.
-        # So `k` effectively changes semantic from "offset" to "absolute index".
-        # If k became 487, it effectively "caught up" to being an index?
-        # No, `k` was 484. `k+=3` -> 487.
-        # If `data[k+3]` scans `data[3..486]`.
-        # Then we want `data[487]`.
-        # So `k` (which is 487) is used as index `data[487]`.
-        # This is correct.
-        
         marioFloats = (float(parts[487]), float(parts[488]))
         
         # k += 2 -> 489

@@ -4,7 +4,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import numpy as np
 import torch
-import marioai
+import src.marioai as marioai
 from agents import MLPAgent, CodeAgent
 from tasks import MoveForwardTask, HunterTask
 import pickle as pkl

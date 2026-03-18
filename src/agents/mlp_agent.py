@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from marioai.agent import Agent
+from src.marioai.agent import Agent
 
 class MLP(nn.Module):
     def __init__(self, input_dim, output_dim):

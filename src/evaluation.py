@@ -1,8 +1,8 @@
-from marioai.experiment import Experiment
+from src.marioai.experiment import Experiment
 from multiprocessing import Pool, Manager, current_process
 from itertools import cycle
-from agents import MLPAgent, CodeAgent
-from tasks import MoveForwardTask, HunterTask
+from src.agents import MLPAgent, CodeAgent
+from src.tasks import MoveForwardTask, HunterTask
 import numpy as np
 
 # Variable that configures the number of parallel processes

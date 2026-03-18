@@ -9,36 +9,9 @@ import argparse
 import datetime
 from pathlib import Path
 
-# USER IMPORTS (Assuming evaluate is provided in your evaluation.py)
-from evaluation import evaluate, evaluate_population
-
-# -----------------------------------------------------------------------------
-# USER IMPORTS / MOCKS
-# -----------------------------------------------------------------------------
-try:
-    import marioai
-    from agents import CodeAgent, Mario, Sprite
-except ImportError:
-    # Mocks for standalone testing if libraries are missing
-    class Mario:
-        KEY_LEFT, KEY_RIGHT, KEY_DOWN, KEY_JUMP, KEY_SPEED = 0, 1, 2, 3, 4
-
-    class Sprite:
-        KIND_GOOMBA = 80
-        KIND_GOOMBA_WINGED = 81
-        KIND_RED_KOOPA = 82
-        KIND_RED_KOOPA_WINGED = 83
-        KIND_GREEN_KOOPA = 84
-        KIND_GREEN_KOOPA_WINGED = 85
-        KIND_BULLET_BILL = 86
-        KIND_SPIKY = 87
-        KIND_SPIKY_WINGED = 88
-
-    class CodeAgent:
-        pass
-
-    print("Warning: marioai/agents modules not found. Using mocks.")
-
+from src.evaluation import evaluate, evaluate_population
+import src.marioai as marioai
+from src.agents import CodeAgent, Mario, Sprite
 from deap import base, creator, tools, gp
 
 
@@ -255,7 +228,12 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--gen", type=int, default=10)
     parser.add_argument("--pop", type=int, default=20)
-    parser.add_argument("--max_height", type=int, default=17)
+    parser.add_argument(
+        "--mode",
+        choices=["evolution", "random"],
+        default="evolution",
+        help="Search mode for GP.",
+    )
     args = parser.parse_args()
 
     random.seed(args.seed)
@@ -284,7 +262,8 @@ if __name__ == "__main__":
     NGEN = args.gen
     CXPB, MUTPB = 0.5, 0.2
 
-    print(f"Starting Evolution: {NGEN} generations, Population size {args.pop}")
+    if args.mode == "random":
+        print(f"Starting Random Search: {NGEN} generations, Population size {args.pop}")
 
     for gen in range(NGEN):
         print(f"\n--- Generation {gen} ---")
@@ -304,24 +283,47 @@ if __name__ == "__main__":
         for key, value in record.items():
             print(f"  {key}: {value}")
 
-        # Select the next generation individuals
-        offspring = toolbox.select(pop, len(pop))
-        offspring = list(map(toolbox.clone, offspring))
+            for ind, fit in zip(pop, fitnesses):
+                ind.fitness.values = (fit,)
 
-        # Apply crossover and mutation
-        for child1, child2 in zip(offspring[::2], offspring[1::2]):
-            if random.random() < CXPB:
-                toolbox.mate(child1, child2)
-                del child1.fitness.values
-                del child2.fitness.values
+            hof.update(pop)
+            record = stats.compile(pop)
+            print(f"Stats: {record}")
+    else:
+        print(f"Starting Evolution: {NGEN} generations, Population size {args.pop}")
 
-        for mutant in offspring:
-            if random.random() < MUTPB:
-                toolbox.mutate(mutant)
-                del mutant.fitness.values
+        for gen in range(NGEN):
+            print(f"\n--- Generation {gen} ---")
+            
+            # Parallel evaluation
+            compiled_pop = [compile_individual(ind) for ind in pop]
+            fitnesses = evaluate_population(CodeAgent, compiled_pop)
+            
+            for ind, fit in zip(pop, fitnesses):
+                ind.fitness.values = (fit,)
+            
+            hof.update(pop)
+            record = stats.compile(pop)
+            print(f"Stats: {record}")
 
-        # Replace population
-        pop[:] = offspring
+            # Select the next generation individuals
+            offspring = toolbox.select(pop, len(pop))
+            offspring = list(map(toolbox.clone, offspring))
+
+            # Apply crossover and mutation
+            for child1, child2 in zip(offspring[::2], offspring[1::2]):
+                if random.random() < CXPB:
+                    toolbox.mate(child1, child2)
+                    del child1.fitness.values
+                    del child2.fitness.values
+
+            for mutant in offspring:
+                if random.random() < MUTPB:
+                    toolbox.mutate(mutant)
+                    del mutant.fitness.values
+
+            # Replace population
+            pop[:] = offspring
 
         # Elitism: Ensure the best individual survives
         if len(hof) > 0:

@@ -3,7 +3,7 @@ import socket
 import logging
 import time
 
-from marioai.utils import extractObservation
+from src.marioai.utils import extractObservation
 
 __all__ = ['Environment']
 

@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from marioai.task import Task
+from src.marioai.task import Task
 
 class HunterTask(Task):
     def __init__(self, *args, **kwargs):

@@ -1,5 +1,5 @@
 
-import marioai
+import src.marioai as marioai
 
 __all__ = ['Task']
 
