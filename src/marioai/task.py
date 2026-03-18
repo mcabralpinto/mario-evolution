@@ -90,10 +90,12 @@ class Task(object):
 
     def perform_action(self, action):
         '''Bridge to environment.'''
+        # Always accumulate the reward computed in get_sensors(), including
+        # the final fitness packet received when an episode ends.
+        self.cum_reward += self.reward
 
         if not self.finished:
             self.env.perform_action(action)
-            self.cum_reward += self.reward
             self.samples += 1
 
 

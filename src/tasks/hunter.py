@@ -39,6 +39,8 @@ class HunterTask(Task):
         
         # 1. Base reward for moving forward
         reward += (current_obs.distance - last_obs.distance)
+        # Small shaping bonus for absolute progress in the level
+        reward += current_obs.distance * 0.001
         
         # 2. Reward for "killing" enemies
         last_enemies_count = len(last_obs.enemies)

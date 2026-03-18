@@ -4,6 +4,7 @@ from itertools import cycle
 from src.agents import MLPAgent, CodeAgent
 from src.tasks import MoveForwardTask, HunterTask
 import numpy as np
+import random
 
 # Variable that configures the number of parallel processes
 N_PROCESSES = 5
@@ -14,7 +15,7 @@ TASK_TO_SOLVE = MoveForwardTask#HunterTask
 
 
 port_list = [4242 + i for i in range(N_PROCESSES)]
-def evaluate_agent(agent, task, episodes=1):
+def evaluate_agent(agent, task, episodes=3):
     """
     Evaluates the agent on the task for a given number of episodes.
     Returns the average fitness (reward).
@@ -27,11 +28,17 @@ def evaluate_agent(agent, task, episodes=1):
 
     for _ in range(episodes):
         episode_reward = 0
+        # Randomize level layout so GP does not overfit a single "always right" map.
+        task.env.level_seed = random.randint(1, 10_000_000)
         task.level_difficulty = 0
         # Try up to 3 levels of increasing difficulty
         for _ in range(3):
             rewards = exp.doEpisodes(1)
             episode_reward += task.cum_reward
+            if task.status == 1:
+                episode_reward += 200.0
+            else:
+                episode_reward -= 50.0
             
             if task.status == 1: # WIN
                 task.level_difficulty += 1
