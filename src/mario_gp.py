@@ -266,30 +266,30 @@ if __name__ == "__main__":
     if args.mode == "random":
         print(f"Starting Random Search: {NGEN} generations, Population size {args.pop}")
 
-    for gen in range(NGEN):
-        print(f"\n--- Generation {gen} ---")
-        
-        # Parallel evaluation
-        compiled_pop = [compile_individual(ind) for ind in pop]
-        fitnesses = evaluate_population(CodeAgent, compiled_pop)
-        
-        for ind, fit in zip(pop, fitnesses):
-            # Parsimony Pressure: Penalize large trees to fight bloat
-            fit -= len(ind) * 0.1 # Adjust this weight based on performance
-            ind.fitness.values = (fit,)
-        
-        hof.update(pop)
-        record = stats.compile(pop)
-        print(f"Stats:")
-        for key, value in record.items():
-            print(f"  {key}: {value}")
-
+        for gen in range(NGEN):
+            print(f"\n--- Generation {gen} ---")
+            
+            # Parallel evaluation
+            compiled_pop = [compile_individual(ind) for ind in pop]
+            fitnesses = evaluate_population(CodeAgent, compiled_pop)
+            
             for ind, fit in zip(pop, fitnesses):
+                # Parsimony Pressure: Penalize large trees to fight bloat
+                fit -= len(ind) * 0.1 # Adjust this weight based on performance
                 ind.fitness.values = (fit,)
-
+            
             hof.update(pop)
             record = stats.compile(pop)
-            print(f"Stats: {record}")
+            print(f"Stats:")
+            for key, value in record.items():
+                print(f"  {key}: {value}")
+
+                for ind, fit in zip(pop, fitnesses):
+                    ind.fitness.values = (fit,)
+
+                hof.update(pop)
+                record = stats.compile(pop)
+                print(f"Stats: {record}")
     else:
         print(f"Starting Evolution: {NGEN} generations, Population size {args.pop}")
 
@@ -301,6 +301,8 @@ if __name__ == "__main__":
             fitnesses = evaluate_population(CodeAgent, compiled_pop)
             
             for ind, fit in zip(pop, fitnesses):
+                # Parsimony Pressure: Penalize large trees to fight bloat
+                fit -= len(ind) * 0.1 # Adjust this weight based on performance
                 ind.fitness.values = (fit,)
             
             hof.update(pop)
