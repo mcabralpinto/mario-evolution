@@ -5,8 +5,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import numpy as np
 import torch
 import src.marioai as marioai
-from agents import MLPAgent, CodeAgent
-from tasks import MoveForwardTask, HunterTask
+from src.agents import MLPAgent, CodeAgent
+from src.tasks import MoveForwardTask, HunterTask
 import pickle as pkl
 import inspect
 import src.data.gp_best_agents.gp_mario_best as mario_best
