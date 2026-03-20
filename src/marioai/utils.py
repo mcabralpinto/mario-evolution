@@ -3,6 +3,10 @@ import numpy
 
 __all__ = ['extractObservation', 'Observation']
 
+
+def _parse_bool_token(token):
+    return token == "true"
+
 class Observation(object):
     """
     Structured observation data from the environment.
@@ -65,11 +69,10 @@ def extractObservation(data):
     """
     if isinstance(data, bytes):
         data = data.decode()
-
     # Handle fast TCP 'E' message (Merged observation)
     if data[0] == 'E':
-        mayMarioJump = (data[1] == '1')
-        isMarioOnGround = (data[2] == '1')
+        mayMarioJump = _parse_bool_token(data[1])
+        isMarioOnGround = _parse_bool_token(data[2])
         levelScene = decode(data[3:34])
         # data[34:] checks sum but we can skip strict check for speed or implement if needed
         return Observation(may_jump=mayMarioJump, on_ground=isMarioOnGround, level_scene=levelScene)
@@ -85,8 +88,8 @@ def extractObservation(data):
         return Observation(status=status, distance=distance, time_left=timeLeft, mario_mode=marioMode, coins=coins)
 
     elif parts[0] == 'O':
-        mayMarioJump = (parts[1] == 'true')
-        isMarioOnGround = (parts[2] == 'true')
+        mayMarioJump = _parse_bool_token(parts[1])
+        isMarioOnGround = _parse_bool_token(parts[2])
         
         # Parse Level Scene (22x22 flattened)
         # However, 'O' message format in original MarioAI is usually:
@@ -127,4 +130,3 @@ def extractObservation(data):
         # Fallback or error
         # print("Unknown data format:", data)
         return Observation()
-
