@@ -289,13 +289,6 @@ obstacle_values = {
 for value, name in obstacle_values.items():
     pset.addTerminal(value, TileValue, name=name)
 
-# Key Index Terminals (for action vector positions)
-pset.addTerminal(0, Key, name="KEY_BACKWARD")    
-pset.addTerminal(1, Key, name="KEY_FORWARD")     
-pset.addTerminal(2, Key, name="KEY_CROUCH")      
-pset.addTerminal(3, Key, name="KEY_JUMP")        
-pset.addTerminal(4, Key, name="KEY_SPEED_BOMB")
-
 # Boolean Terminals
 pset.addTerminal(True, Bool, name="TRUE")
 pset.addTerminal(False, Bool, name="FALSE")

@@ -1,6 +1,6 @@
 
 # Evolved Mario Controller
-# Fitness: 2356.111981445278
+# Fitness: 2034.3346490071372
 
 
 def corre(action, landscape, enemies, can_jump, on_ground, Mario, Sprite, **kwargs):
@@ -22,8 +22,17 @@ def corre(action, landscape, enemies, can_jump, on_ground, Mario, Sprite, **kwar
 
     # INDIVIDUAL GENERATED CODE vvv
 
+    if enemy_near:
+        if (landscape is not None and 0 <= 13 < landscape.shape[0] and 0 <= 11 < landscape.shape[1] and landscape[13, 11] != -11):
+            if obstacle_ahead:
+                if any((ek > 9) and (abs(ex) <= 16) and (abs(ey) <= 16) for ex, ey, ek in enemies):
+                    action[Mario.KEY_RIGHT] = 1
+                action[Mario.KEY_JUMP] = 1
+        if (landscape is not None and 0 <= 11 < landscape.shape[0] and 0 <= 11 < landscape.shape[1] and landscape[11, 11] != 20):
+            pass
+            if (landscape is not None and 0 <= 13 < landscape.shape[0] and 0 <= 11 < landscape.shape[1] and landscape[13, 11] < 21):
+                pass
     action[Mario.KEY_RIGHT] = 1
-    action[Mario.KEY_JUMP] = 1
-    if ((any((ek == 9) and (abs(ex) <= 32) and (abs(ey) <= 32) for ex, ey, ek in enemies) and ((on_ground and (not hole_ahead)) and (can_jump and (enemy_near and any((ek == 12) and (abs(ex) <= 32) and (abs(ey) <= 32) for ex, ey, ek in enemies))))) and any((ek == 2) and (abs(ex) <= 32) and (abs(ey) <= 32) for ex, ey, ek in enemies)):
-        action[Mario.KEY_SPEED] = 1
+    if (not (can_jump and (landscape is not None and 0 <= 13 < landscape.shape[0] and 0 <= 9 < landscape.shape[1] and landscape[13, 9] != 21))):
+        action[Mario.KEY_RIGHT] = 1
 
