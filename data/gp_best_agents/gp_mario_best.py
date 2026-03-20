@@ -1,6 +1,6 @@
 
 # Evolved Mario Controller
-# Fitness: 3403.9740162434837
+# Fitness: 2356.111981445278
 
 
 def corre(action, landscape, enemies, can_jump, on_ground, Mario, Sprite, **kwargs):
@@ -22,8 +22,8 @@ def corre(action, landscape, enemies, can_jump, on_ground, Mario, Sprite, **kwar
 
     # INDIVIDUAL GENERATED CODE vvv
 
-    if can_jump:
-        action[Mario.KEY_JUMP] = int(True)
-    action[1] = int(True)
-    action[Mario.KEY_SPEED] = int(True)
+    action[Mario.KEY_RIGHT] = 1
+    action[Mario.KEY_JUMP] = 1
+    if ((any((ek == 9) and (abs(ex) <= 32) and (abs(ey) <= 32) for ex, ey, ek in enemies) and ((on_ground and (not hole_ahead)) and (can_jump and (enemy_near and any((ek == 12) and (abs(ex) <= 32) and (abs(ey) <= 32) for ex, ey, ek in enemies))))) and any((ek == 2) and (abs(ex) <= 32) and (abs(ey) <= 32) for ex, ey, ek in enemies)):
+        action[Mario.KEY_SPEED] = 1
 

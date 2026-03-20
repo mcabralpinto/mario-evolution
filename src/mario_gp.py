@@ -127,22 +127,8 @@ def str_if_then(cond, expr):
 def str_sequence(expr1, expr2):
     return f"{expr1}\n{expr2}"
 
-
-def str_set_action(key, val):
-    return f"action[{key}] = int({val})"
-
-
-def str_press_right():
-    return "action[Mario.KEY_RIGHT] = int(True)"
-
-
-def str_press_jump():
-    return "action[Mario.KEY_JUMP] = int(True)"
-
-
-def str_press_speed():
-    return "action[Mario.KEY_SPEED] = int(True)"
-
+def str_action_press(key):
+    return f"action[{key}] = 1"
 
 def str_and(cond1, cond2):
     return f"({cond1} and {cond2})"
@@ -226,10 +212,7 @@ pset = gp.PrimitiveSetTyped("MAIN", [], Expr)
 # Core Logic
 pset.addPrimitive(str_if_then, [Condition, Expr], Expr)
 pset.addPrimitive(str_sequence, [Expr, Expr], Expr)
-pset.addPrimitive(str_set_action, [Key, Bool], Expr)
-pset.addTerminal(str_press_right(), Expr, name="PRESS_RIGHT")
-pset.addTerminal(str_press_jump(), Expr, name="PRESS_JUMP")
-pset.addTerminal(str_press_speed(), Expr, name="PRESS_SPEED")
+pset.addPrimitive(str_action_press, [Key], Expr)
 pset.addTerminal("pass", Expr, name="NoOp")
 
 # Boolean Logic
@@ -248,7 +231,7 @@ pset.addTerminal("obstacle_ahead", Condition, name="ObstacleAhead")
 pset.addTerminal("hole_ahead", Condition, name="HoleAhead")
 
 # Position Terminals (relative to Mario at [11,11])
-position_values = [-1, 0, 1]
+position_values = [-2, 0, 2]
 
 
 def int_terminal_name(prefix, value):
