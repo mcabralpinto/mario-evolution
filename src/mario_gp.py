@@ -66,22 +66,6 @@ def indent(text):
     return "\n".join("    " + line for line in text.split("\n"))
 
 BASE_FUNCTION = f"""def corre(action, landscape, enemies, can_jump, on_ground, Mario, Sprite, **kwargs):
-    # Process sensors (Heuristics)
-    enemy_near = any(abs(ex) < 30 and abs(ey) < 30 for ex, ey, ek in enemies)
-    obstacle_ahead = False
-    if landscape is not None:
-        # Check a few cells in front of Mario (11,11)
-        obstacle_ahead = (landscape[11, 12] != 0 or landscape[11, 13] != 0 or landscape[10, 12] != 0)
-
-    hole_ahead = False
-    if landscape is not None:
-        # Check for floor gap
-        hole_ahead = True
-        for i in range(12, 16):
-            if landscape[12, i] != 0 or landscape[13, i] != 0:
-                hole_ahead = False
-                break
-
     # INDIVIDUAL GENERATED CODE vvv
 """
 
@@ -226,9 +210,6 @@ pset.addPrimitive(str_distance_to_enemy, [EnemyKind], Condition, name="DistanceT
 # Senses (Mapped to variables in corre function)
 pset.addTerminal("on_ground", Condition, name="IsMarioOnGround")
 pset.addTerminal("can_jump", Condition, name="MayMarioJump")
-pset.addTerminal("enemy_near", Condition, name="EnemyNear")
-pset.addTerminal("obstacle_ahead", Condition, name="ObstacleAhead")
-pset.addTerminal("hole_ahead", Condition, name="HoleAhead")
 
 # Position Terminals (relative to Mario at [11,11])
 position_values = [-2, 0, 2]
@@ -292,9 +273,6 @@ for value, name in obstacle_values.items():
 # Boolean Terminals
 pset.addTerminal(True, Bool, name="TRUE")
 pset.addTerminal(False, Bool, name="FALSE")
-
-# No-operation Terminal
-pset.addTerminal("pass", Expr, name="NOOP")
 
 # Constants
 pset.addTerminal("True", Bool)

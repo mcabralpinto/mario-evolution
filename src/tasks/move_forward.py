@@ -16,27 +16,13 @@ class MoveForwardTask(Task):
         reward = 0
         # calculate distance in any direction
         dist_moved = abs(current_obs.distance - last_obs.distance)  
-        pass_obstacles = 0
-        if last_obs.level_scene is not None:
-            wall_ahead = (
-                last_obs.level_scene[11, 12] != 0
-                or last_obs.level_scene[11, 13] != 0
-                or last_obs.level_scene[10, 12] != 0
-            )
-            hole_ahead = True
-            for i in range(12, 16):
-                if last_obs.level_scene[12, i] != 0 or last_obs.level_scene[13, i] != 0:
-                    hole_ahead = False
-                    break
-            if (wall_ahead or hole_ahead) and dist_moved <= 0:
-                pass_obstacles -= 10
-            elif wall_ahead or hole_ahead:
-                pass_obstacles += 1
-            if (wall_ahead or hole_ahead) and (not current_obs.on_ground):
-                pass_obstacles += 1
-            if (wall_ahead or hole_ahead) and current_obs.on_ground and dist_moved <= 0:
-                pass_obstacles -= 10
+        reward = dist_moved
+        # jump walls reward
+        if dist_moved == 0:
+            self.no_progress_steps += 1
+            if self.no_progress_steps > 5:  
+                reward -= 100
+        else:
+            self.no_progress_steps = 0  # reset counter if progress is made
 
-
-        reward = dist_moved + pass_obstacles
         return reward
