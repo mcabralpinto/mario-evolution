@@ -13,12 +13,10 @@ class MoveForwardTask(Task):
     def compute_reward(self, current_obs, last_obs):
         if last_obs is None:
             return 0
-        
-        dist_moved = current_obs.distance - last_obs.distance
-        reward = dist_moved * 2.0
-        reward += current_obs.distance * 0.002
-
-        # Strongly punish getting stuck at obstacles to break "always right" behavior.
+        reward = 0
+        # calculate distance in any direction
+        dist_moved = abs(current_obs.distance - last_obs.distance)  
+        pass_obstacles = 0
         if last_obs.level_scene is not None:
             wall_ahead = (
                 last_obs.level_scene[11, 12] != 0
@@ -31,15 +29,20 @@ class MoveForwardTask(Task):
                     hole_ahead = False
                     break
             if (wall_ahead or hole_ahead) and dist_moved <= 0:
-                reward -= 1.5
+                pass_obstacles -= 1
             elif wall_ahead or hole_ahead:
-                reward += 0.5
+                pass_obstacles += 1
             if (wall_ahead or hole_ahead) and (not current_obs.on_ground):
-                reward += 1.0
+                pass_obstacles += 1
             if (wall_ahead or hole_ahead) and current_obs.on_ground and dist_moved <= 0:
-                reward -= 0.8
+                pass_obstacles -= 1
 
+        dont_fall_into_holes = 0
         if current_obs.on_ground and not last_obs.on_ground:
-            reward += 0.3
+            dont_fall_into_holes += 1
+        elif not current_obs.on_ground and last_obs.on_ground:
+            dont_fall_into_holes -= 1
 
+        print("Reward weights: dist_moved =", dist_moved, ", pass_obstacles =", pass_obstacles, ", dont_fall_into_holes =", dont_fall_into_holes)
+        reward = dist_moved + pass_obstacles + dont_fall_into_holes
         return reward

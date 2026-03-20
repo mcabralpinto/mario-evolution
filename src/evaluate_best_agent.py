@@ -16,7 +16,6 @@ def load_gp_best_module():
     repo_root = Path(__file__).parent.parent
     candidate_paths = [
         repo_root / "data" / "gp_best_agents" / "gp_mario_best.py",
-        repo_root / "src" / "data" / "gp_best_agents" / "gp_mario_best.py",
     ]
     for module_path in candidate_paths:
         if module_path.exists():
@@ -26,7 +25,7 @@ def load_gp_best_module():
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
             return module
-    raise FileNotFoundError("No gp_mario_best.py found in data/gp_best_agents or src/data/gp_best_agents.")
+    raise FileNotFoundError("No gp_mario_best.py found in data/gp_best_agents")
 
 
 def evaluate_code_agent():

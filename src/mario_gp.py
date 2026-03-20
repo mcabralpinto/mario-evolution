@@ -7,17 +7,12 @@ import pickle
 import copy
 import argparse
 import datetime
-import re
-from typing import Any, Callable, cast
 from pathlib import Path
 
 from src.evaluation import evaluate, evaluate_population
 import src.marioai as marioai
 from src.agents import CodeAgent, Mario, Sprite
 from deap import base, creator, tools, gp
-
-MAX_LOOP_STEPS = 64
-PARSIMONY_COEFF = 0.02
 
 
 # -----------------------------------------------------------------------------
@@ -71,77 +66,23 @@ def safe_gen_grow(pset, min_, max_, type_=None):
 def indent(text):
     return "\n".join("    " + line for line in text.split("\n"))
 
-
-def coerce_fitness(value):
-    if value is None:
-        return 0.0
-    return float(value)
-
-
-def action_diversity_bonus(code_str):
-    keys = set(re.findall(r"action\[Mario\.(KEY_[A-Z]+)\]\s*=\s*int\(True\)", code_str))
-    if not keys:
-        return -10.0
-
-    bonus = 12.0 * len(keys)
-    if keys == {"KEY_RIGHT"}:
-        bonus -= 60.0
-    if "KEY_JUMP" in keys:
-        bonus += 20.0
-    if "KEY_SPEED" in keys:
-        bonus += 8.0
-    return bonus
-
 BASE_FUNCTION = f"""def corre(action, landscape, enemies, can_jump, on_ground, Mario, Sprite, **kwargs):
-    # --- SENSORS & HEURISTICS ---
-    
-    # 1. ENEMY RADAR
-    # Categorize enemies by relative position to Mario
-    enemy_near = any(abs(ex) < 40 and abs(ey) < 40 for ex, ey, ek in enemies)
-    enemy_ahead = any(0 < ex < 50 and abs(ey) < 20 for ex, ey, ek in enemies)
-    enemy_above = any(abs(ex) < 20 and -40 < ey < -5 for ex, ey, ek in enemies)
-    enemy_behind = any(-40 < ex < 0 and abs(ey) < 20 for ex, ey, ek in enemies)
-
-    # 2. LANDSCAPE ANALYZER
-    wall_ahead = False
+    # Process sensors (Heuristics)
+    enemy_near = any(abs(ex) < 30 and abs(ey) < 30 for ex, ey, ek in enemies)
     obstacle_ahead = False
-    hole_ahead = False
-    slope_ahead = False
-    
     if landscape is not None:
-        # Mario is centered at roughly [11, 11] in the 22x22 grid
-        # wall_tiles usually: -10 (border), 16, 20, 21 (bricks/blocks)
-        wall_tiles = (-10, 16, 20, 21)
-        
-        # Check for vertical obstacles (walls) 1 or 2 blocks ahead
-        wall_ahead = any(landscape[row, 12] in wall_tiles for row in range(9, 12)) or \
-                     any(landscape[row, 13] in wall_tiles for row in range(9, 12))
-        
-        # Check for low obstacles (pipes/steps) Mario can jump over
-        obstacle_ahead = landscape[11, 12] != 0 or landscape[11, 13] != 0
-        
-        # Check for slopes (is the ground rising?)
-        slope_ahead = landscape[10, 12] != 0
-        
-        # Check for floor gaps (Holes)
-        # Scan 1 to 4 tiles ahead at Mario's feet level
+        # Check a few cells in front of Mario (11,11)
+        obstacle_ahead = (landscape[11, 12] != 0 or landscape[11, 13] != 0 or landscape[10, 12] != 0)
+
+    hole_ahead = False
+    if landscape is not None:
+        # Check for floor gap
         hole_ahead = True
-        for x_off in range(12, 16): 
-            if landscape[12, x_off] != 0 or landscape[13, x_off] != 0:
+        for i in range(12, 16):
+            if landscape[i, 12] != 0:
                 hole_ahead = False
                 break
 
-    # 3. STATE AGGREGATION
-    # A general "Danger" flag if a jump is likely the only solution
-    danger_ahead = hole_ahead or wall_ahead or enemy_ahead
-
-    # 4. SAFE DEFAULT POLICY
-    action[Mario.KEY_RIGHT] = int(True)
-    if danger_ahead and can_jump:
-        action[Mario.KEY_JUMP] = int(True)
-    if enemy_near:
-        action[Mario.KEY_SPEED] = int(True)
-    
     # INDIVIDUAL GENERATED CODE vvv
 """
 
@@ -191,14 +132,6 @@ def str_or(cond1, cond2):
 def str_not(cond):
     return f"(not {cond})"
 
-def while_loop(cond, expr):
-    return (
-        f"for _ in range({MAX_LOOP_STEPS}):\n"
-        f"    if not ({cond}):\n"
-        "        break\n"
-        f"{indent(expr)}"
-    )
-
 
 # -----------------------------------------------------------------------------
 # 3. GRAMMAR CONFIGURATION
@@ -209,7 +142,6 @@ pset = gp.PrimitiveSetTyped("MAIN", [], Expr)
 pset.addPrimitive(str_if_then, [Condition, Expr], Expr)
 pset.addPrimitive(str_sequence, [Expr, Expr], Expr)
 pset.addPrimitive(str_set_action, [Key, Bool], Expr)
-pset.addPrimitive(while_loop, [Condition, Expr], Expr, name="WHILE")
 pset.addTerminal("pass", Expr, name="NoOp")
 
 # Boolean Logic
@@ -221,14 +153,8 @@ pset.addPrimitive(str_not, [Condition], Condition, name="NOT")
 pset.addTerminal("on_ground", Condition, name="IsMarioOnGround")
 pset.addTerminal("can_jump", Condition, name="MayMarioJump")
 pset.addTerminal("enemy_near", Condition, name="EnemyNear")
-pset.addTerminal("wall_ahead", Condition, name="WallAhead")
 pset.addTerminal("obstacle_ahead", Condition, name="ObstacleAhead")
 pset.addTerminal("hole_ahead", Condition, name="HoleAhead")
-pset.addTerminal("enemy_ahead", Condition, name="EnemyAhead")
-pset.addTerminal("enemy_above", Condition, name="EnemyAbove")
-pset.addTerminal("enemy_behind", Condition, name="EnemyBehind")
-pset.addTerminal("slope_ahead", Condition, name="SlopeAhead")
-pset.addTerminal("danger_ahead", Condition, name="DangerAhead")
 
 # Constants
 pset.addTerminal("True", Bool)
@@ -248,17 +174,14 @@ creator.create("FitnessMax", base.Fitness, weights=(1.0,))
 creator.create("Individual", gp.PrimitiveTree, fitness=creator.FitnessMax)
 
 toolbox = base.Toolbox()
-toolbox.register("expr", safe_gen_grow, pset=pset, min_=2, max_=9)
-expr_fn = cast(Callable[[], Any], getattr(toolbox, "expr"))
-toolbox.register("individual", tools.initIterate, creator.Individual, expr_fn)
-individual_fn = cast(Callable[[], Any], getattr(toolbox, "individual"))
-toolbox.register("population", tools.initRepeat, list, individual_fn)
+toolbox.register("expr", safe_gen_grow, pset=pset, min_=3, max_=6)
+toolbox.register("individual", tools.initIterate, creator.Individual, toolbox.expr)
+toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 toolbox.register("compile", gp.compile, pset=pset)
-compile_fn = cast(Callable[[Any], str], getattr(toolbox, "compile"))
 
 def compile_individual(individual):
     """Converts a tree individual into Python code string."""
-    code_body = compile_fn(individual)
+    code_body = toolbox.compile(individual)
     full_code_str = f"""
 {BASE_FUNCTION}
 {indent(code_body)}
@@ -273,7 +196,7 @@ def best_individual_code(best_ind, toolbox):
     """Returns the best individual's code as a string."""
     return f"""
 {BASE_FUNCTION}
-{indent(compile_fn(best_ind))}
+{indent(toolbox.compile(best_ind))}
 """
 
 def save_best_individual(best_ind, toolbox, filename_py=f"mario_best_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.py"):
@@ -305,8 +228,7 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--gen", type=int, default=10)
     parser.add_argument("--pop", type=int, default=20)
-    parser.add_argument("--max_height", type=int, default=28)
-    parser.add_argument("--max_loop_steps", type=int, default=64)
+    parser.add_argument("--max_height", type=int, default=17)
     parser.add_argument(
         "--mode",
         choices=["evolution", "random"],
@@ -314,29 +236,21 @@ if __name__ == "__main__":
         help="Search mode for GP.",
     )
     args = parser.parse_args()
-    MAX_LOOP_STEPS = max(1, args.max_loop_steps)
 
     random.seed(args.seed)
     
     # Genetic Operators - experiment with these values! try elitism
-    toolbox.register("select", tools.selTournament, tournsize=3)
+    toolbox.register("select", tools.selTournament, tournsize=5)
     toolbox.register("mate", gp.cxOnePoint)
-    toolbox.register("expr_mut", safe_gen_grow, pset=pset, min_=0, max_=4) 
-    expr_mut_fn = cast(Callable[[], Any], getattr(toolbox, "expr_mut"))
-    toolbox.register("mutate", gp.mutUniform, expr=expr_mut_fn, pset=pset)
-    select_fn = cast(Callable[[list, int], list], getattr(toolbox, "select"))
-    mate_fn = cast(Callable[[Any, Any], Any], getattr(toolbox, "mate"))
-    mutate_fn = cast(Callable[[Any], Any], getattr(toolbox, "mutate"))
-    clone_fn = cast(Callable[[Any], Any], getattr(toolbox, "clone"))
-    decorate_fn = cast(Callable[[str, Any], Any], getattr(toolbox, "decorate"))
-    population_fn = cast(Callable[..., list], getattr(toolbox, "population"))
+    toolbox.register("expr_mut", safe_gen_grow, pset=pset, min_=0, max_=2) 
+    toolbox.register("mutate", gp.mutUniform, expr=toolbox.expr_mut, pset=pset)
 
     # Decorators to limit tree height
-    decorate_fn("mate", gp.staticLimit(key=operator.attrgetter("height"), max_value=args.max_height))
-    decorate_fn("mutate", gp.staticLimit(key=operator.attrgetter("height"), max_value=args.max_height))
+    toolbox.decorate("mate", gp.staticLimit(key=operator.attrgetter("height"), max_value=args.max_height)) 
+    toolbox.decorate("mutate", gp.staticLimit(key=operator.attrgetter("height"), max_value=args.max_height))
 
     # Population Initialization
-    pop = population_fn(n=args.pop)
+    pop = toolbox.population(n=args.pop)
     hof = tools.HallOfFame(1)
 
     stats = tools.Statistics(lambda ind: ind.fitness.values)
@@ -347,93 +261,86 @@ if __name__ == "__main__":
 
     # Evolutionary Algorithm
     NGEN = args.gen
-    CXPB, MUTPB = 0.5, 0.45
+    CXPB, MUTPB = 0.5, 0.2
 
     if args.mode == "random":
         print(f"Starting Random Search: {NGEN} generations, Population size {args.pop}")
 
         for gen in range(NGEN):
             print(f"\n--- Generation {gen} ---")
-            pop = population_fn(n=args.pop)
             
             # Parallel evaluation
             compiled_pop = [compile_individual(ind) for ind in pop]
             fitnesses = evaluate_population(CodeAgent, compiled_pop)
             
-            for ind, raw_fit, code_str in zip(pop, fitnesses, compiled_pop):
+            for ind, fit in zip(pop, fitnesses):
                 # Parsimony Pressure: Penalize large trees to fight bloat
-                fit = (
-                    coerce_fitness(raw_fit)
-                    - len(ind) * PARSIMONY_COEFF
-                    + action_diversity_bonus(code_str)
-                )
+                fit -= len(ind) * 0.1 # Adjust this weight based on performance
+                ind.fitness.values = (fit,)
+            
+            hof.update(pop)
+            record = stats.compile(pop)
+            print(f"Stats:")
+            for key, value in record.items():
+                print(f"  {key}: {value}")
+
+                for ind, fit in zip(pop, fitnesses):
+                    ind.fitness.values = (fit,)
+
+                hof.update(pop)
+                record = stats.compile(pop)
+                print(f"Stats: {record}")
+    else:
+        print(f"Starting Evolution: {NGEN} generations, Population size {args.pop}")
+
+        for gen in range(NGEN):
+            print(f"\n--- Generation {gen} ---")
+            
+            # Parallel evaluation
+            compiled_pop = [compile_individual(ind) for ind in pop]
+            fitnesses = evaluate_population(CodeAgent, compiled_pop)
+            
+            for ind, fit in zip(pop, fitnesses):
+                # Parsimony Pressure: Penalize large trees to fight bloat
+                fit -= len(ind) * 0.1 # Adjust this weight based on performance
                 ind.fitness.values = (fit,)
             
             hof.update(pop)
             record = stats.compile(pop)
             print(f"Stats: {record}")
-    else:
-        print(f"Starting Evolution: {NGEN} generations, Population size {args.pop}")
-        
-        # Parallel evaluation
-        compiled_pop = [compile_individual(ind) for ind in pop]
-        fitnesses = evaluate_population(CodeAgent, compiled_pop)
-        
-        for ind, raw_fit, code_str in zip(pop, fitnesses, compiled_pop):
-            # Parsimony Pressure: Penalize large trees to fight bloat
-            fit = (
-                coerce_fitness(raw_fit)
-                - len(ind) * PARSIMONY_COEFF
-                + action_diversity_bonus(code_str)
-            )
-            ind.fitness.values = (fit,)
-        
-        hof.update(pop)
-
-        for gen in range(NGEN):
-            print(f"\n--- Generation {gen} ---")
-            record = stats.compile(pop)
-            print(f"Stats: {record}")
 
             # Select the next generation individuals
-            offspring = select_fn(pop, len(pop))
-            offspring = list(map(clone_fn, offspring))
+            offspring = toolbox.select(pop, len(pop))
+            offspring = list(map(toolbox.clone, offspring))
 
             # Apply crossover and mutation
             for child1, child2 in zip(offspring[::2], offspring[1::2]):
                 if random.random() < CXPB:
-                    mate_fn(child1, child2)
+                    toolbox.mate(child1, child2)
                     del child1.fitness.values
                     del child2.fitness.values
 
             for mutant in offspring:
                 if random.random() < MUTPB:
-                    mutate_fn(mutant)
+                    toolbox.mutate(mutant)
                     del mutant.fitness.values
-            
-            invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
-            compiled_invalid = [compile_individual(ind) for ind in invalid_ind]
-            fitnesses = evaluate_population(CodeAgent, compiled_invalid)
-            
-            for ind, raw_fit, code_str in zip(invalid_ind, fitnesses, compiled_invalid):
-                ind.fitness.values = (
-                    coerce_fitness(raw_fit)
-                    - len(ind) * PARSIMONY_COEFF
-                    + action_diversity_bonus(code_str),
-                )
+
+            # Replace population
             pop[:] = offspring
 
-            if len(hof) > 0:
-                worst_idx = min(range(len(pop)), key=lambda i: pop[i].fitness.values[0])
-                pop[worst_idx] = clone_fn(hof[0])
-            hof.update(pop)
-            record = stats.compile(pop)
-            print(f"Stats: {record}")
+        # Elitism: Ensure the best individual survives
+        if len(hof) > 0:
+            pop[0] = toolbox.clone(hof[0])
+
         print(f"Best fitness in Generation {gen}: {hof[0].fitness.values[0] if hof[0].fitness.valid else 'N/A'}")
         print(f"Best Ind. Height: {hof[0].height}, Size: {len(hof[0])}")
         print("Best Code Structure:")
         print(best_individual_code(hof[0], toolbox))
 
+        # #print another random code from this gen
+        # print("Random Code Structure:")
+        # print(best_individual_code(random.choice(pop), toolbox))
+        
 
     # Final result
     best_ind = hof[0]
