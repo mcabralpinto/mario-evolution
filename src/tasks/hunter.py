@@ -32,33 +32,33 @@ class HunterTask(Task):
         Since we don't have explicit kill counts, we estimate kills by 
         detecting when enemies near Mario disappear.
         """
-        if last_obs is None:
-            return 0
+        # if last_obs is None:
+        #     return 0
         
-        reward = 0
+        # reward = 0
         
-        # 1. Base reward for moving forward
-        reward += (current_obs.distance - last_obs.distance)
-        # Small shaping bonus for absolute progress in the level
-        reward += current_obs.distance * 0.001
+        # # 1. Base reward for moving forward
+        # reward += (current_obs.distance - last_obs.distance)
+        # # Small shaping bonus for absolute progress in the level
+        # reward += current_obs.distance * 0.001
         
-        # 2. Reward for "killing" enemies
-        last_enemies_count = len(last_obs.enemies)
-        current_enemies_count = len(current_obs.enemies)
+        # # 2. Reward for "killing" enemies
+        # last_enemies_count = len(last_obs.enemies)
+        # current_enemies_count = len(current_obs.enemies)
         
-        if current_enemies_count < last_enemies_count:
-            # Check if any enemy from last_obs was "near" Mario
-            for ex, ey, ek in last_obs.enemies:
-                # If enemy was within a small radius and is gone
-                if abs(ex) < 20 and abs(ey) < 20: 
-                    # Verify it's not in current_obs
-                    is_gone = True
-                    for cex, cey, cek in current_obs.enemies:
-                        # Simple check for same enemy (approximate)
-                        if abs(cex - ex) < 10 and abs(cey - ey) < 10:
-                            is_gone = False
-                            break
-                    if is_gone:
-                        reward += 100 # Kill bonus
+        # if current_enemies_count < last_enemies_count:
+        #     # Check if any enemy from last_obs was "near" Mario
+        #     for ex, ey, ek in last_obs.enemies:
+        #         # If enemy was within a small radius and is gone
+        #         if abs(ex) < 20 and abs(ey) < 20: 
+        #             # Verify it's not in current_obs
+        #             is_gone = True
+        #             for cex, cey, cek in current_obs.enemies:
+        #                 # Simple check for same enemy (approximate)
+        #                 if abs(cex - ex) < 10 and abs(cey - ey) < 10:
+        #                     is_gone = False
+        #                     break
+        #             if is_gone:
+        #                 reward += 100 # Kill bonus
         
-        return reward
+        # return reward

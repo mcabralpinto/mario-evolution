@@ -1,6 +1,6 @@
 
 # Evolved Mario Controller
-# Fitness: 2310.9679823404617
+# Fitness: 2021.007982340471
 
 
 def corre(action, landscape, enemies, can_jump, on_ground, Mario, Sprite, **kwargs):
@@ -22,5 +22,5 @@ def corre(action, landscape, enemies, can_jump, on_ground, Mario, Sprite, **kwar
 
     # INDIVIDUAL GENERATED CODE vvv
 
-    action[Mario.KEY_RIGHT] = int(True)
+    action[1] = int(True)
 

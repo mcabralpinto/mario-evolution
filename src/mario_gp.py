@@ -49,7 +49,6 @@ def safe_gen_grow(pset, min_, max_, type_=None):
                 should_grow = False
             else:
                 should_grow = random.random() < 0.5
-
         if should_grow:
             prim = random.choice(pset.primitives[type_])
             expr.append(prim)
@@ -132,6 +131,65 @@ def str_or(cond1, cond2):
 def str_not(cond):
     return f"(not {cond})"
 
+def str_check_enemy(posx, posy, comp, enemy_type):
+    ''' 
+        The goal is to make Mario enemy-aware.
+        Currently, posx and posy can be seen as the 
+        radius around Mario to check for enemies.
+        Comp is a comparator like <, >, == to compare the count of enemies in that radius to a threshold.
+        Enemy_type can be used to specify different types of enemies 
+    '''
+    # Enemies arrive as (x, y, kind) tuples relative to Mario.
+    # Keep this a pure boolean expression because it is embedded inside if/and/or trees.
+    return (
+        f"any((ek {comp} {enemy_type}) and "
+        f"(abs(ex) <= {max(1, abs(posx)) * 16}) and "
+        f"(abs(ey) <= {max(1, abs(posy)) * 16}) "
+        f"for ex, ey, ek in enemies)"
+    )
+
+def str_check_obstacle(pos_x, pos_y, comp, obstacle_value):
+    """
+    Same as above but for obstacles in the landscape.
+    """
+    x = 11 + pos_x
+    y = 11 + pos_y
+    # Use landscape (the function argument) and guard against missing observations.
+    return f"(landscape is not None and landscape[{y}, {x}] {comp} {obstacle_value})"
+
+def str_distance_to_enemy(enemy_type):
+    """
+    Heuristic to compute distance to the nearest enemy of a given type.
+    enemy_type: Integer enemy type.
+    """
+    # Return a boolean condition (nearby enemy of this type) as a single expression.
+    return (
+        f"any((ek == {enemy_type}) and (abs(ex) <= 32) and (abs(ey) <= 32) "
+        f"for ex, ey, ek in enemies)"
+    )
+def str_on_ground():
+    return "on_ground"
+
+def str_can_jump():
+    return "can_jump"
+
+def str_go_foward():
+    return "[0, 1, 0, 0, 0]"
+
+def str_go_back():
+    return "[1, 0, 0, 0, 0]"
+
+def str_jump():
+    return "[0, 0, 1, 0, 0]"
+
+def str_speed():
+    return "[0, 0, 0, 1, 0]"
+
+def str_down():
+    return "[0, 0, 0, 0, 1]"
+
+def str_combine_actions(action1, action2):
+    return f"list(np.logical_or({action1}, {action2}).astype(int))"
 
 # -----------------------------------------------------------------------------
 # 3. GRAMMAR CONFIGURATION
@@ -148,6 +206,9 @@ pset.addTerminal("pass", Expr, name="NoOp")
 pset.addPrimitive(str_and, [Condition, Condition], Condition, name="AND")
 pset.addPrimitive(str_or, [Condition, Condition], Condition, name="OR")
 pset.addPrimitive(str_not, [Condition], Condition, name="NOT")
+pset.addPrimitive(str_check_enemy, [int, int, str, int], Condition, name="CheckEnemy")
+pset.addPrimitive(str_check_obstacle, [int, int, str, int], Condition, name="CheckObstacle")
+pset.addPrimitive(str_distance_to_enemy, [int], Condition, name="DistanceToEnemy")
 
 # Senses (Mapped to variables in corre function)
 pset.addTerminal("on_ground", Condition, name="IsMarioOnGround")
@@ -155,6 +216,79 @@ pset.addTerminal("can_jump", Condition, name="MayMarioJump")
 pset.addTerminal("enemy_near", Condition, name="EnemyNear")
 pset.addTerminal("obstacle_ahead", Condition, name="ObstacleAhead")
 pset.addTerminal("hole_ahead", Condition, name="HoleAhead")
+
+# Position Terminals (relative to Mario at [11,11])
+position_values = [-1, 0, 1]
+
+
+def int_terminal_name(prefix, value):
+    # DEAP terminal names are used as Python identifiers in compiled expressions.
+    # Negative values like -1 must not produce names such as X_-1.
+    if value < 0:
+        return f"{prefix}_NEG{abs(value)}"
+    return f"{prefix}_{value}"
+
+
+for x in position_values:
+    pset.addTerminal(x, int, name=int_terminal_name("X", x))
+
+for y in position_values:
+    pset.addTerminal(y, int, name=int_terminal_name("Y", y))
+
+# Or if you want them combined:
+for val in position_values:
+    pset.addTerminal(val, int, name=int_terminal_name("POS", val))
+
+# Comparator Terminals
+pset.addTerminal("==", str, name="EQ")
+pset.addTerminal("!=", str, name="NE")
+pset.addTerminal("<", str, name="LT")
+pset.addTerminal(">", str, name="GT")
+
+# Enemy Type Terminals (from Table 1)
+enemy_types = {
+    2: "GOOMBA",
+    3: "GOOMBA_WINGED", 
+    4: "RED_KOOPA",
+    5: "RED_KOOPA_WINGED",
+    6: "GREEN_KOOPA",
+    7: "GREEN_KOOPA_WINGED",
+    8: "BULLET_BILL",
+    9: "SPIKY",
+    10: "SPIKY_WINGED",
+    12: "PIRANHA_FLOWER",
+    13: "SHELL"
+}
+
+for value, name in enemy_types.items():
+    pset.addTerminal(value, int, name=name)
+
+# Obstacle Value Terminals
+obstacle_values = {
+    -11: "SOFT_OBSTACLE",
+    -10: "HARD_OBSTACLE",
+    0: "EMPTY_SPACE",
+    16: "BRICK",
+    20: "ENEMY_OBSTACLE",
+    21: "QUESTION_BRICK"
+}
+
+for value, name in obstacle_values.items():
+    pset.addTerminal(value, int, name=name)
+
+# Key Index Terminals (for action vector positions)
+pset.addTerminal(0, Key, name="KEY_BACKWARD")    
+pset.addTerminal(1, Key, name="KEY_FORWARD")     
+pset.addTerminal(2, Key, name="KEY_CROUCH")      
+pset.addTerminal(3, Key, name="KEY_JUMP")        
+pset.addTerminal(4, Key, name="KEY_SPEED_BOMB")
+
+# Boolean Terminals
+pset.addTerminal(True, Bool, name="TRUE")
+pset.addTerminal(False, Bool, name="FALSE")
+
+# No-operation Terminal
+pset.addTerminal("pass", Expr, name="NOOP")
 
 # Constants
 pset.addTerminal("True", Bool)
@@ -174,7 +308,7 @@ creator.create("FitnessMax", base.Fitness, weights=(1.0,))
 creator.create("Individual", gp.PrimitiveTree, fitness=creator.FitnessMax)
 
 toolbox = base.Toolbox()
-toolbox.register("expr", safe_gen_grow, pset=pset, min_=3, max_=6)
+toolbox.register("expr", safe_gen_grow, pset=pset, min_=3, max_=7)
 toolbox.register("individual", tools.initIterate, creator.Individual, toolbox.expr)
 toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 toolbox.register("compile", gp.compile, pset=pset)
@@ -242,7 +376,7 @@ if __name__ == "__main__":
     # Genetic Operators - experiment with these values! try elitism
     toolbox.register("select", tools.selTournament, tournsize=5)
     toolbox.register("mate", gp.cxOnePoint)
-    toolbox.register("expr_mut", safe_gen_grow, pset=pset, min_=0, max_=2) 
+    toolbox.register("expr_mut", safe_gen_grow, pset=pset, min_=2, max_=5) 
     toolbox.register("mutate", gp.mutUniform, expr=toolbox.expr_mut, pset=pset)
 
     # Decorators to limit tree height
