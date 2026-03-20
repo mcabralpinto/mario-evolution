@@ -29,20 +29,14 @@ class MoveForwardTask(Task):
                     hole_ahead = False
                     break
             if (wall_ahead or hole_ahead) and dist_moved <= 0:
-                pass_obstacles -= 1
+                pass_obstacles -= 10
             elif wall_ahead or hole_ahead:
                 pass_obstacles += 1
             if (wall_ahead or hole_ahead) and (not current_obs.on_ground):
                 pass_obstacles += 1
             if (wall_ahead or hole_ahead) and current_obs.on_ground and dist_moved <= 0:
-                pass_obstacles -= 1
+                pass_obstacles -= 10
 
-        dont_fall_into_holes = 0
-        if current_obs.on_ground and not last_obs.on_ground:
-            dont_fall_into_holes += 1
-        elif not current_obs.on_ground and last_obs.on_ground:
-            dont_fall_into_holes -= 1
 
-        print("Reward weights: dist_moved =", dist_moved, ", pass_obstacles =", pass_obstacles, ", dont_fall_into_holes =", dont_fall_into_holes)
-        reward = dist_moved + pass_obstacles + dont_fall_into_holes
+        reward = dist_moved + pass_obstacles
         return reward

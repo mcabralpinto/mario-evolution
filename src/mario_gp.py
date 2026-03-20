@@ -78,7 +78,7 @@ BASE_FUNCTION = f"""def corre(action, landscape, enemies, can_jump, on_ground, M
         # Check for floor gap
         hole_ahead = True
         for i in range(12, 16):
-            if landscape[i, 12] != 0:
+            if landscape[12, i] != 0 or landscape[13, i] != 0:
                 hole_ahead = False
                 break
 
@@ -105,6 +105,18 @@ class Bool:
     pass
 
 
+class Offset:
+    pass
+
+
+class EnemyKind:
+    pass
+
+
+class TileValue:
+    pass
+
+
 # -----------------------------------------------------------------------------
 # 2. PRIMITIVES: STRING BUILDERS
 # -----------------------------------------------------------------------------
@@ -118,6 +130,18 @@ def str_sequence(expr1, expr2):
 
 def str_set_action(key, val):
     return f"action[{key}] = int({val})"
+
+
+def str_press_right():
+    return "action[Mario.KEY_RIGHT] = int(True)"
+
+
+def str_press_jump():
+    return "action[Mario.KEY_JUMP] = int(True)"
+
+
+def str_press_speed():
+    return "action[Mario.KEY_SPEED] = int(True)"
 
 
 def str_and(cond1, cond2):
@@ -154,8 +178,11 @@ def str_check_obstacle(pos_x, pos_y, comp, obstacle_value):
     """
     x = 11 + pos_x
     y = 11 + pos_y
-    # Use landscape (the function argument) and guard against missing observations.
-    return f"(landscape is not None and landscape[{y}, {x}] {comp} {obstacle_value})"
+    # Guard against missing observations and invalid indexes.
+    return (
+        f"(landscape is not None and 0 <= {y} < landscape.shape[0] and "
+        f"0 <= {x} < landscape.shape[1] and landscape[{y}, {x}] {comp} {obstacle_value})"
+    )
 
 def str_distance_to_enemy(enemy_type):
     """
@@ -200,15 +227,18 @@ pset = gp.PrimitiveSetTyped("MAIN", [], Expr)
 pset.addPrimitive(str_if_then, [Condition, Expr], Expr)
 pset.addPrimitive(str_sequence, [Expr, Expr], Expr)
 pset.addPrimitive(str_set_action, [Key, Bool], Expr)
+pset.addTerminal(str_press_right(), Expr, name="PRESS_RIGHT")
+pset.addTerminal(str_press_jump(), Expr, name="PRESS_JUMP")
+pset.addTerminal(str_press_speed(), Expr, name="PRESS_SPEED")
 pset.addTerminal("pass", Expr, name="NoOp")
 
 # Boolean Logic
 pset.addPrimitive(str_and, [Condition, Condition], Condition, name="AND")
 pset.addPrimitive(str_or, [Condition, Condition], Condition, name="OR")
 pset.addPrimitive(str_not, [Condition], Condition, name="NOT")
-pset.addPrimitive(str_check_enemy, [int, int, str, int], Condition, name="CheckEnemy")
-pset.addPrimitive(str_check_obstacle, [int, int, str, int], Condition, name="CheckObstacle")
-pset.addPrimitive(str_distance_to_enemy, [int], Condition, name="DistanceToEnemy")
+pset.addPrimitive(str_check_enemy, [Offset, Offset, str, EnemyKind], Condition, name="CheckEnemy")
+pset.addPrimitive(str_check_obstacle, [Offset, Offset, str, TileValue], Condition, name="CheckObstacle")
+pset.addPrimitive(str_distance_to_enemy, [EnemyKind], Condition, name="DistanceToEnemy")
 
 # Senses (Mapped to variables in corre function)
 pset.addTerminal("on_ground", Condition, name="IsMarioOnGround")
@@ -230,14 +260,14 @@ def int_terminal_name(prefix, value):
 
 
 for x in position_values:
-    pset.addTerminal(x, int, name=int_terminal_name("X", x))
+    pset.addTerminal(x, Offset, name=int_terminal_name("X", x))
 
 for y in position_values:
-    pset.addTerminal(y, int, name=int_terminal_name("Y", y))
+    pset.addTerminal(y, Offset, name=int_terminal_name("Y", y))
 
 # Or if you want them combined:
 for val in position_values:
-    pset.addTerminal(val, int, name=int_terminal_name("POS", val))
+    pset.addTerminal(val, Offset, name=int_terminal_name("POS", val))
 
 # Comparator Terminals
 pset.addTerminal("==", str, name="EQ")
@@ -261,7 +291,7 @@ enemy_types = {
 }
 
 for value, name in enemy_types.items():
-    pset.addTerminal(value, int, name=name)
+    pset.addTerminal(value, EnemyKind, name=name)
 
 # Obstacle Value Terminals
 obstacle_values = {
@@ -274,7 +304,7 @@ obstacle_values = {
 }
 
 for value, name in obstacle_values.items():
-    pset.addTerminal(value, int, name=name)
+    pset.addTerminal(value, TileValue, name=name)
 
 # Key Index Terminals (for action vector positions)
 pset.addTerminal(0, Key, name="KEY_BACKWARD")    
@@ -308,7 +338,7 @@ creator.create("FitnessMax", base.Fitness, weights=(1.0,))
 creator.create("Individual", gp.PrimitiveTree, fitness=creator.FitnessMax)
 
 toolbox = base.Toolbox()
-toolbox.register("expr", safe_gen_grow, pset=pset, min_=3, max_=7)
+toolbox.register("expr", safe_gen_grow, pset=pset, min_=3, max_=10)
 toolbox.register("individual", tools.initIterate, creator.Individual, toolbox.expr)
 toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 toolbox.register("compile", gp.compile, pset=pset)

@@ -1,6 +1,6 @@
 
 # Evolved Mario Controller
-# Fitness: 2021.007982340471
+# Fitness: 3403.9740162434837
 
 
 def corre(action, landscape, enemies, can_jump, on_ground, Mario, Sprite, **kwargs):
@@ -16,11 +16,14 @@ def corre(action, landscape, enemies, can_jump, on_ground, Mario, Sprite, **kwar
         # Check for floor gap
         hole_ahead = True
         for i in range(12, 16):
-            if landscape[i, 12] != 0:
+            if landscape[12, i] != 0 or landscape[13, i] != 0:
                 hole_ahead = False
                 break
 
     # INDIVIDUAL GENERATED CODE vvv
 
+    if can_jump:
+        action[Mario.KEY_JUMP] = int(True)
     action[1] = int(True)
+    action[Mario.KEY_SPEED] = int(True)
 
