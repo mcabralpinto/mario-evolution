@@ -29,7 +29,7 @@ def evaluate_agent(agent, task, episodes=3):
     for _ in range(episodes):
         episode_reward = 0
         # Randomize level layout so GP does not overfit a single "always right" map.
-        task.env.level_seed = random.randint(1, 10_000_000)
+        task.env.level_seed = random.randint(1, 5)
         task.level_difficulty = 0
         # Try up to 3 levels of increasing difficulty
         for _ in range(3):

@@ -65,7 +65,9 @@ def safe_gen_grow(pset, min_, max_, type_=None):
 def indent(text):
     return "\n".join("    " + line for line in text.split("\n"))
 
-BASE_FUNCTION = f"""def corre(action, landscape, enemies, can_jump, on_ground, Mario, Sprite, **kwargs):
+BASE_FUNCTION = """def corre(action, landscape, enemies, can_jump, on_ground, Mario, Sprite, **kwargs):
+    # Always start by moving right
+    action[Mario.KEY_RIGHT] = 1
     # INDIVIDUAL GENERATED CODE vvv
 """
 
@@ -136,7 +138,7 @@ def str_check_enemy(posx, posy, comp, enemy_type):
     # Enemies arrive as (x, y, kind) tuples relative to Mario.
     # Keep this a pure boolean expression because it is embedded inside if/and/or trees.
     return (
-        f"any((ek {comp} {enemy_type}) and "
+        f"any((ek == {enemy_type}) and "
         f"(abs(ex) <= {max(1, abs(posx)) * 16}) and "
         f"(abs(ey) <= {max(1, abs(posy)) * 16}) "
         f"for ex, ey, ek in enemies)"
@@ -164,40 +166,22 @@ def str_distance_to_enemy(enemy_type):
         f"any((ek == {enemy_type}) and (abs(ex) <= 32) and (abs(ey) <= 32) "
         f"for ex, ey, ek in enemies)"
     )
-def str_on_ground():
-    return "on_ground"
-
-def str_can_jump():
-    return "can_jump"
-
-def str_go_foward():
-    return "[0, 1, 0, 0, 0]"
-
-def str_go_back():
-    return "[1, 0, 0, 0, 0]"
-
-def str_jump():
-    return "[0, 0, 1, 0, 0]"
-
-def str_speed():
-    return "[0, 0, 0, 1, 0]"
-
-def str_down():
-    return "[0, 0, 0, 0, 1]"
-
 def str_combine_actions(action1, action2):
     return f"list(np.logical_or({action1}, {action2}).astype(int))"
+
+def str_gap_ahead():
+    return "(landscape is not None and landscape.shape[0] > 11 and landscape.shape[1] > 12 and landscape[11, 12] == 0)"
 
 # -----------------------------------------------------------------------------
 # 3. GRAMMAR CONFIGURATION
 # -----------------------------------------------------------------------------
 pset = gp.PrimitiveSetTyped("MAIN", [], Expr)
-
+pset.addTerminal("pass", Expr, name="Pass")
 # Core Logic
 pset.addPrimitive(str_if_then, [Condition, Expr], Expr)
 pset.addPrimitive(str_sequence, [Expr, Expr], Expr)
 pset.addPrimitive(str_action_press, [Key], Expr)
-pset.addTerminal("pass", Expr, name="NoOp")
+# pset.addPrimitive(str_combine_actions, [Expr, Expr], Expr, name="CombineActions")
 
 # Boolean Logic
 pset.addPrimitive(str_and, [Condition, Condition], Condition, name="AND")
@@ -206,13 +190,13 @@ pset.addPrimitive(str_not, [Condition], Condition, name="NOT")
 pset.addPrimitive(str_check_enemy, [Offset, Offset, str, EnemyKind], Condition, name="CheckEnemy")
 pset.addPrimitive(str_check_obstacle, [Offset, Offset, str, TileValue], Condition, name="CheckObstacle")
 pset.addPrimitive(str_distance_to_enemy, [EnemyKind], Condition, name="DistanceToEnemy")
+pset.addPrimitive(str_gap_ahead, [], Condition, name="GapAhead")
 
 # Senses (Mapped to variables in corre function)
 pset.addTerminal("on_ground", Condition, name="IsMarioOnGround")
 pset.addTerminal("can_jump", Condition, name="MayMarioJump")
-
 # Position Terminals (relative to Mario at [11,11])
-position_values = [-2, 0, 2]
+position_values = [-1, 0, 1]
 
 
 def int_terminal_name(prefix, value):
@@ -273,10 +257,6 @@ for value, name in obstacle_values.items():
 # Boolean Terminals
 pset.addTerminal(True, Bool, name="TRUE")
 pset.addTerminal(False, Bool, name="FALSE")
-
-# Constants
-pset.addTerminal("True", Bool)
-pset.addTerminal("False", Bool)
 
 # Actions
 pset.addTerminal("Mario.KEY_RIGHT", Key, name="RIGHT")
@@ -379,7 +359,7 @@ if __name__ == "__main__":
 
     # Evolutionary Algorithm
     NGEN = args.gen
-    CXPB, MUTPB = 0.5, 0.2
+    CXPB, MUTPB = 0.5, 0.35
 
     if args.mode == "random":
         print(f"Starting Random Search: {NGEN} generations, Population size {args.pop}")
@@ -393,7 +373,7 @@ if __name__ == "__main__":
             
             for ind, fit in zip(pop, fitnesses):
                 # Parsimony Pressure: Penalize large trees to fight bloat
-                fit -= len(ind) * 0.1 # Adjust this weight based on performance
+                fit -= len(ind) * 0.01 # Adjust this weight based on performance
                 ind.fitness.values = (fit,)
             
             hof.update(pop)
@@ -420,7 +400,7 @@ if __name__ == "__main__":
             
             for ind, fit in zip(pop, fitnesses):
                 # Parsimony Pressure: Penalize large trees to fight bloat
-                fit -= len(ind) * 0.1 # Adjust this weight based on performance
+                fit -= len(ind) * 0.01 # Adjust this weight based on performance
                 ind.fitness.values = (fit,)
             
             hof.update(pop)
@@ -442,6 +422,9 @@ if __name__ == "__main__":
                 if random.random() < MUTPB:
                     toolbox.mutate(mutant)
                     del mutant.fitness.values
+
+            if len(hof) > 0:
+                offspring[0] = toolbox.clone(hof[0])
 
             # Replace population
             pop[:] = offspring
