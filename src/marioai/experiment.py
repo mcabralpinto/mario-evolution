@@ -8,7 +8,7 @@ class Experiment(object):
     def __init__(self, task, agent):
         self.task = task
         self.agent = agent
-        self.max_fps = -1
+        self.max_fps = 30
 
     def _step(self):
         self.agent.sense(self.task.get_sensors())

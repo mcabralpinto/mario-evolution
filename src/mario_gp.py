@@ -66,8 +66,6 @@ def indent(text):
     return "\n".join("    " + line for line in text.split("\n"))
 
 BASE_FUNCTION = """def corre(action, landscape, enemies, can_jump, on_ground, Mario, Sprite, **kwargs):
-    # Always start by moving right
-    action[Mario.KEY_RIGHT] = 1
     # INDIVIDUAL GENERATED CODE vvv
 """
 
@@ -161,7 +159,6 @@ def str_distance_to_enemy(enemy_type):
     Heuristic to compute distance to the nearest enemy of a given type.
     enemy_type: Integer enemy type.
     """
-    # Return a boolean condition (nearby enemy of this type) as a single expression.
     return (
         f"any((ek == {enemy_type}) and (abs(ex) <= 32) and (abs(ey) <= 32) "
         f"for ex, ey, ek in enemies)"
@@ -196,7 +193,7 @@ pset.addPrimitive(str_gap_ahead, [], Condition, name="GapAhead")
 pset.addTerminal("on_ground", Condition, name="IsMarioOnGround")
 pset.addTerminal("can_jump", Condition, name="MayMarioJump")
 # Position Terminals (relative to Mario at [11,11])
-position_values = [-1, 0, 1]
+position_values = [-3, 0, 3]
 
 
 def int_terminal_name(prefix, value):

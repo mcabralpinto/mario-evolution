@@ -22,7 +22,7 @@ def evaluate_agent(agent, task, episodes=3):
     """
     exp = Experiment(task, agent)
     # Speed up simulation for training
-    exp.max_fps = -1 
+    exp.max_fps = -1
     
     total_reward = 0
 
