@@ -1,6 +1,3 @@
-import torch
-import torch.nn as nn
-import numpy as np
 from src.marioai.task import Task
 
 class HunterTask(Task):
@@ -10,19 +7,24 @@ class HunterTask(Task):
         self.no_progress_steps = 0
         self.total_reward = 0
 
+        self.kill_reward = 10.0
+        self.kill_radius_x = 40
+        self.kill_radius_y = 40
+        self.match_radius_x = 20
+        self.match_radius_y = 20
+
     def compute_reward(self, current_obs, last_obs):
         if last_obs is None:
-            return 0
-        
-        reward = 0
-        
-        # 1 Reward for forward progress
-        # 1.1 basic forward progress reward
+            return 0.0
+
+        reward = 0.0
+
+        # ---------- Forward progress ----------
         delta_distance = current_obs.distance - last_obs.distance
-        forward_progress = max(delta_distance, 0)
+        forward_progress = max(delta_distance, 0.0)
 
         reward += (forward_progress ** 1.2) * 0.1
-        # 1.2 penalize lack of progress
+
         if forward_progress < 1.0:
             self.no_progress_steps += 1
             if self.no_progress_steps >= 5:
@@ -30,20 +32,32 @@ class HunterTask(Task):
         else:
             self.no_progress_steps = 0
 
+        # ---------- Enemy kill reward ----------
+        kill_reward = 0.0
+
+        for ex, ey, ek in last_obs.enemies:
+
+            # enemy must have been near Mario previously
+            if abs(ex) > 40 or abs(ey) > 40:
+                continue
+
+            still_visible = False
+
+            for cex, cey, cek in current_obs.enemies:
+
+                if (
+                    ek == cek
+                    and abs(cex - ex) < 20
+                    and abs(cey - ey) < 20
+                ):
+                    still_visible = True
+                    break
+
+            # only reward if enemy disappeared AND mario didn't outrun it
+            if not still_visible and delta_distance < 15:
+                kill_reward += 50.0
+
+        reward += kill_reward
+
         self.total_reward += reward
-        # 2. Reward for "killing" enemies
-        last_enemies = last_obs.enemies
-        current_enemies = current_obs.enemies
-
-        for ex, ey, ek in last_enemies: 
-            num_of_existing_enemies = 0
-            if abs(ex) < 10 and abs(ey) < 10:
-                for cex, cey, cek in current_enemies:
-                    if abs(cex - ex) < 20 and abs(cey - ey) < 20:
-                      num_of_existing_enemies += 1
-
-            reward += num_of_existing_enemies * 10.0                        
-
-
-                
         return reward
