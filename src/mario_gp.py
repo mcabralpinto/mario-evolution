@@ -163,11 +163,12 @@ def str_distance_to_enemy(enemy_type):
         f"any((ek == {enemy_type}) and (abs(ex) <= 32) and (abs(ey) <= 32) "
         f"for ex, ey, ek in enemies)"
     )
-def str_combine_actions(action1, action2):
-    return f"list(np.logical_or({action1}, {action2}).astype(int))"
 
 def str_gap_ahead():
     return "(landscape is not None and landscape.shape[0] > 11 and landscape.shape[1] > 12 and landscape[11, 12] == 0)"
+
+def str_combine_actions(action1, action2):
+    return f"[{action1} or {action2} for {action1}, {action2} in zip({action1}, {action2})]"
 
 # -----------------------------------------------------------------------------
 # 3. GRAMMAR CONFIGURATION
@@ -261,6 +262,7 @@ pset.addTerminal("Mario.KEY_LEFT", Key, name="LEFT")
 pset.addTerminal("Mario.KEY_JUMP", Key, name="JUMP")
 pset.addTerminal("Mario.KEY_SPEED", Key, name="SPEED")
 pset.addTerminal("Mario.KEY_DOWN", Key, name="DOWN")
+
 
 # -----------------------------------------------------------------------------
 # 4. RANDOM GENERATION SETUP
