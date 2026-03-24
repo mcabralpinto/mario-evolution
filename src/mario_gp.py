@@ -165,10 +165,7 @@ def str_distance_to_enemy(enemy_type):
     )
 
 def str_gap_ahead():
-    return "(landscape is not None and landscape.shape[0] > 11 and landscape.shape[1] > 12 and landscape[11, 12] == 0)"
-
-def str_combine_actions(action1, action2):
-    return f"[{action1} or {action2} for {action1}, {action2} in zip({action1}, {action2})]"
+    return "landscape[11,12] == 0 and landscape[12,12] == 0"
 
 # -----------------------------------------------------------------------------
 # 3. GRAMMAR CONFIGURATION
@@ -179,7 +176,6 @@ pset.addTerminal("pass", Expr, name="Pass")
 pset.addPrimitive(str_if_else, [Condition, Expr, Expr], Expr)
 pset.addPrimitive(str_sequence, [Expr, Expr], Expr)
 pset.addPrimitive(str_action_press, [Key], Expr)
-# pset.addPrimitive(str_combine_actions, [Expr, Expr], Expr, name="CombineActions")
 
 # Boolean Logic
 pset.addPrimitive(str_and, [Condition, Condition], Condition, name="AND")
@@ -358,7 +354,7 @@ if __name__ == "__main__":
 
     # Evolutionary Algorithm
     NGEN = args.gen
-    CXPB, MUTPB = 0.5, 0.35
+    CXPB, MUTPB = 0.65, 0.35
 
     if args.mode == "random":
         print(f"Starting Random Search: {NGEN} generations, Population size {args.pop}")
