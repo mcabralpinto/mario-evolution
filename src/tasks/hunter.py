@@ -56,7 +56,7 @@ class HunterTask(Task):
 
             # only reward if enemy disappeared AND mario didn't outrun it
             if not still_visible and delta_distance < 15:
-                kill_reward += 100.0
+                kill_reward += 1000.0
 
         kill_reward = kill_reward * (3*walk_reward/kill_reward) if kill_reward > 0 and  walk_reward > kill_reward else -0.5 * walk_reward
         reward += kill_reward

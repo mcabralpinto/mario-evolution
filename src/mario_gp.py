@@ -104,8 +104,8 @@ class TileValue:
 # -----------------------------------------------------------------------------
 # 2. PRIMITIVES: STRING BUILDERS
 # -----------------------------------------------------------------------------
-def str_if_then(cond, expr):
-    return f"if {cond}:\n{indent(expr)}"
+def str_if_else(cond, expr_true, expr_false):
+    return f"if {cond}:\n{indent(expr_true)}\nelse:\n{indent(expr_false)}"
 
 
 def str_sequence(expr1, expr2):
@@ -176,7 +176,7 @@ def str_combine_actions(action1, action2):
 pset = gp.PrimitiveSetTyped("MAIN", [], Expr)
 pset.addTerminal("pass", Expr, name="Pass")
 # Core Logic
-pset.addPrimitive(str_if_then, [Condition, Expr], Expr)
+pset.addPrimitive(str_if_else, [Condition, Expr, Expr], Expr)
 pset.addPrimitive(str_sequence, [Expr, Expr], Expr)
 pset.addPrimitive(str_action_press, [Key], Expr)
 # pset.addPrimitive(str_combine_actions, [Expr, Expr], Expr, name="CombineActions")
