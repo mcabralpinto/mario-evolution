@@ -12,7 +12,7 @@ def corre(action, landscape, enemies, can_jump, on_ground, Mario, Sprite, mario_
               all(landscape[y, 12] == 0 for y in range(12, 22))
 
     solids = [-10, 16, 20, 21]
-    is_wall = any(landscape[x, y] in solids for x in range(10, 13) for y in range(10, 13)) 
+    is_wall = any(landscape[x, y] in solids for x in range(11, 13) for y in range(11, 13)) 
 
     enemy_types = [2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]
 
