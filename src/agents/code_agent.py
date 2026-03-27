@@ -51,7 +51,8 @@ class CodeAgent(Agent):
                         'landscape' : self.level_scene, 
                         'enemies' : self.enemies_floats,
                         'can_jump' : self.can_jump,
-                        'on_ground' : self.on_ground
+                        'on_ground' : self.on_ground,
+                        'mario_pos' : self.mario_floats
                         }
             
             self._action_function(**context)

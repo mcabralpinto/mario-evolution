@@ -51,7 +51,15 @@ def safe_gen_grow(pset, min_, max_, type_=None):
             else:
                 should_grow = random.random() < 0.5
         if should_grow:
-            prim = random.choice(pset.primitives[type_])
+            available_primitives = pset.primitives[type_]
+            # If we're at/over max depth, prefer a primitive that does not recurse
+            # on the same return type (e.g., END(Stmt) over SEQ(Stmt, Program)).
+            if depth >= max_:
+                non_recursive = [p for p in available_primitives if type_ not in p.args]
+                if non_recursive:
+                    available_primitives = non_recursive
+
+            prim = random.choice(available_primitives)
             expr.append(prim)
             for arg in reversed(prim.args):
                 stack.append((depth + 1, arg))
@@ -66,7 +74,7 @@ def safe_gen_grow(pset, min_, max_, type_=None):
 def indent(text):
     return "\n".join("    " + line for line in text.split("\n"))
 
-BASE_FUNCTION = """def corre(action, landscape, enemies, can_jump, on_ground, Mario, Sprite, **kwargs):
+BASE_FUNCTION = """def corre(action, landscape, enemies, can_jump, on_ground, mario_pos, Mario, Sprite, **kwargs):
 """
 
 
@@ -81,7 +89,6 @@ class Stmt:
 
 class Expr:
     pass
-
 
 class Cond:
     pass
@@ -117,16 +124,20 @@ def prog_seq(stmt, program_tail):
     return f"{stmt}\n{program_tail}"
 
 
+def prog_end(stmt):
+    return stmt.rstrip()
+
+
 def stmt_if_else(cond, stmt_true, stmt_false):
     return f"if {cond}:\n{indent(stmt_true)}\nelse:\n{indent(stmt_false)}"
 
 
+def stmt_if(cond, stmt_true):
+    return f"if {cond}:\n{indent(stmt_true)}"
+
+
 def stmt_action_assign(key, value):
     return f"action[{key}] = {value}"
-
-
-def stmt_pass():
-    return "pass"
 
 
 def cond_and(cond1, cond2):
@@ -141,14 +152,10 @@ def cond_not(cond):
     return f"(not {cond})"
 
 
-def cond_check_enemy(posx, posy, comp, enemy_type):
-    return (
-        f"any((ek {comp} {enemy_type}) and "
-        f"(abs(ex) <= {max(1, abs(posx)) * 16}) and "
-        f"(abs(ey) <= {max(1, abs(posy)) * 16}) "
-        f"for ex, ey, ek in enemies)"
-    )
-
+def cond_check_enemy_ahead(comp, enemy_type):
+    # if there's an enemy in a 3x3 area ahead of Mario (including diagonals)
+    mario_x, mario_y = 11, 11
+    return f"enemies is not None and any((ek {comp} {enemy_type}) and (abs(ex - {mario_x}) <= 3) and (abs(ey - {mario_y}) <= 3) for ex, ey, ek in enemies)"
 
 def cond_check_obstacle(posx, posy, comp, obstacle_value):
     x = 11 + posx
@@ -161,8 +168,16 @@ def cond_check_obstacle(posx, posy, comp, obstacle_value):
     )
 
 
-def cond_gap_ahead():
-    return "(landscape is not None and landscape[11, 12] == 0 and landscape[12, 12] == 0)"
+def cond_gap_ahead(blocks_ahead):
+    mario_x, mario_y = 11, 11
+    target_x = mario_x + blocks_ahead
+
+    # Expression-only check so GP can inline it into conditions safely.
+    return (
+        "(landscape is not None and "
+        f"0 <= {target_x} < landscape.shape[1] and "
+        f"all(landscape[y, {target_x}] == 0 for y in range({mario_y}, landscape.shape[0])))"
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -171,21 +186,21 @@ def cond_gap_ahead():
 pset = gp.PrimitiveSetTyped("MAIN", [], Program)
 
 # Program structure
-pset.addTerminal("pass", Program, name="END")
+pset.addPrimitive(prog_end, [Stmt], Program, name="END")
 pset.addPrimitive(prog_seq, [Stmt, Program], Program, name="SEQ")
 
 # Statements
-pset.addPrimitive(stmt_if_else, [Cond, Stmt, Stmt], Stmt, name="IF")
+pset.addPrimitive(stmt_if, [Cond, Stmt], Stmt, name="IF")
+pset.addPrimitive(stmt_if_else, [Cond, Stmt, Stmt], Stmt, name="IF_ELSE")
 pset.addPrimitive(stmt_action_assign, [Key, Bool], Stmt, name="SET_ACTION")
-pset.addPrimitive(stmt_pass, [], Stmt, name="PASS_STMT")
 
 # Boolean logic
 pset.addPrimitive(cond_and, [Cond, Cond], Cond, name="AND")
 pset.addPrimitive(cond_or, [Cond, Cond], Cond, name="OR")
 pset.addPrimitive(cond_not, [Cond], Cond, name="NOT")
-pset.addPrimitive(cond_check_enemy, [Offset, Offset, Comparator, EnemyKind], Cond, name="CheckEnemy")
+pset.addPrimitive(cond_check_enemy_ahead, [Comparator, EnemyKind], Cond, name="CheckEnemy")
 pset.addPrimitive(cond_check_obstacle, [Offset, Offset, Comparator, TileValue], Cond, name="CheckObstacle")
-pset.addPrimitive(cond_gap_ahead, [], Cond, name="GapAhead")
+pset.addPrimitive(cond_gap_ahead, [Offset], Cond, name="GapAhead")
 
 # Senses
 pset.addTerminal("on_ground", Cond, name="IsMarioOnGround")
@@ -235,32 +250,14 @@ for value, name in enemy_types.items():
 obstacle_values = {
     -11: "SOFT_OBSTACLE",
     -10: "HARD_OBSTACLE",
-    0: "EMPTY_SPACE",
-    1: "MARIO_TILE",
-    2: "GOOMBA_TILE",
-    3: "GOOMBA_WINGED_TILE",
-    4: "RED_KOOPA_TILE",
-    5: "RED_KOOPA_WINGED_TILE",
-    6: "GREEN_KOOPA_TILE",
-    7: "GREEN_KOOPA_WINGED_TILE",
-    8: "BULLET_BILL_TILE",
-    9: "SPIKY_TILE",
-    10: "SPIKY_WINGED_TILE",
-    12: "PIRANHA_FLOWER_TILE",
-    13: "SHELL_TILE",
-    14: "MUSHROOM_TILE",
-    15: "FIRE_FLOWER_TILE",
     16: "BRICK",
     20: "ENEMY_OBSTACLE",
-    21: "QUESTION_BRICK",
-    25: "PROJECTILE_TILE",
-    42: "UNDEFINED_TILE",
 }
 
 for value, name in obstacle_values.items():
     pset.addTerminal(value, TileValue, name=name)
 
-# Boolean literals for action assignments
+# Numeric literals for action assignments
 pset.addTerminal(True, Bool, name="1")
 pset.addTerminal(False, Bool, name="0")
 
@@ -335,7 +332,7 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--gen", type=int, default=10)
     parser.add_argument("--pop", type=int, default=20)
-    parser.add_argument("--max_height", type=int, default=17)
+    parser.add_argument("--max_height", type=int, default=14)
     parser.add_argument(
         "--mode",
         choices=["evolution", "random"],

@@ -20,10 +20,9 @@ class MoveForwardTask(Task):
 
         delta_distance = current_obs.distance - last_obs.distance
         forward_progress = max(delta_distance, 0)
-
         reward += (forward_progress ** 1.2) * 0.1
 
-        if forward_progress < 1.0:
+        if forward_progress < 0.61:
             self.no_progress_steps += 1
             if self.no_progress_steps >= 5:
                 reward -= 5.0
