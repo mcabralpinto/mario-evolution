@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip show:*)",
+      "Bash(find /c/Users/Utilizador/git/uni/mario-evolution -type f -name *.java)"
+    ]
+  }
+}

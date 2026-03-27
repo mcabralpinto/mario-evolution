@@ -35,6 +35,7 @@ class Task(object):
         self.status = 0
         self.cum_reward = 0
         self.samples = 0
+        self.coins = 0
         self.last_observation = None
 
     def reset(self):
@@ -46,6 +47,7 @@ class Task(object):
         self.finished = False
         self.reward = 0
         self.status = 0
+        self.coins = 0
         self.last_observation = None
     
     def enable_visualization(self):
@@ -71,6 +73,7 @@ class Task(object):
             # Fitness packet (no level scene)
             self.reward = sense.distance # Or standard fitness handling
             self.status = sense.status
+            self.coins = sense.coins
             self.finished = True
         else:
             # Step reward

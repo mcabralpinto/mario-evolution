@@ -1,21 +1,27 @@
 from src.marioai.experiment import Experiment
+from src.marioai.task import Task
 from multiprocessing import Pool, Manager, current_process
 from itertools import cycle
 from src.agents import MLPAgent, CodeAgent
 from src.tasks import MoveForwardTask, HunterTask
 import numpy as np
 import random
+from tqdm import tqdm
 
 # Variable that configures the number of parallel processes
 N_PROCESSES = 5
 # Task Definition
 TASK_TO_SOLVE = HunterTask
 
-
+COIN_WEIGHT = 10
+WIN_REWARD = 200.0
+LOSE_PENALTY = -50.0
 
 
 port_list = [4242 + i for i in range(N_PROCESSES)]
-def evaluate_agent(agent, task, episodes=3):
+
+
+def evaluate_agent(agent, task: Task, episodes=3):
     """
     Evaluates the agent on the task for a given number of episodes.
     Returns the average fitness (reward).
@@ -23,7 +29,7 @@ def evaluate_agent(agent, task, episodes=3):
     exp = Experiment(task, agent)
     # Speed up simulation for training
     exp.max_fps = -1
-    
+
     total_reward = 0
 
     for _ in range(episodes):
@@ -35,44 +41,45 @@ def evaluate_agent(agent, task, episodes=3):
         for _ in range(3):
             rewards = exp.doEpisodes(1)
             episode_reward += task.cum_reward
+            # episode_reward += task.coins * COIN_WEIGHT
             if task.status == 1:
-                episode_reward += 200.0
+                episode_reward += WIN_REWARD
             else:
-                episode_reward -= 50.0
-            
-            if task.status == 1: # WIN
+                episode_reward += LOSE_PENALTY
+
+            if task.status == 1:  # WIN
                 task.level_difficulty += 1
             else:
                 break
-        
-                
+
         total_reward += episode_reward
-        
-    
+
     return total_reward / episodes
 
 
 # --- GLOBAL VARIABLES FOR WORKER PROCESSES ---
 # These exist independently inside EACH worker process.
-worker_task = None 
+worker_task = None
 worker_agent = None
+
 
 def init_worker(agent_class):
     """
     This runs ONCE when each worker process starts.
     """
     global worker_agent, worker_task
-    
-    # Each worker needs to pick a port. Since we have 10 workers 
+
+    # Each worker needs to pick a port. Since we have 10 workers
     # and 10 ports, we can use a trick to assign them.
     import multiprocessing
+
     # Get the index of the current worker (0 through 9)
-    # Note: This is a hacky way to get a unique index; 
+    # Note: This is a hacky way to get a unique index;
     # alternatively, use a shared Counter/Queue.
-    worker_idx = int(multiprocessing.current_process().name.split('-')[-1]) - 1
+    worker_idx = int(multiprocessing.current_process().name.split("-")[-1]) - 1
     port = port_list[worker_idx % len(port_list)]
-    
-    #print(f"Worker initialized: Connecting once to port {port}...")
+
+    # print(f"Worker initialized: Connecting once to port {port}...")
 
     worker_agent = agent_class()
     if worker_task is None:
@@ -85,14 +92,13 @@ def evaluate_individual(ind_info):
     It uses the GLOBALLY cached worker_task.
     """
     global worker_task, worker_agent
-    
+
     # 1. Update the persistent agent with the new DNA
     if isinstance(worker_agent, MLPAgent):
         worker_agent.set_param_vector(ind_info)
     elif isinstance(worker_agent, CodeAgent):
         worker_agent.action_function = ind_info
 
-    
     # 2. Run evaluation using the EXISTING connection
     # No "with", no "connect", just use the persistent object.
     try:
@@ -100,28 +106,38 @@ def evaluate_individual(ind_info):
     except Exception as e:
         print(f"Error in worker: {e}")
         reward = 0
-        
+
     return reward
+
 
 def evaluate(agent_class, ind_info):
     global worker_agent, worker_task
     if worker_agent is None:
         worker_agent = agent_class()
     if worker_task is None:
-        worker_task = TASK_TO_SOLVE(visualization = False, port=port_list[0])
+        worker_task = TASK_TO_SOLVE(visualization=False, port=port_list[0])
     return evaluate_individual(ind_info)
 
 
 def evaluate_population(agent, population):
-    
+
     # Match processes to tasks to avoid one worker being idle or double-booking
     n_processes = N_PROCESSES
 
     # We pass 'tasks' to the initializer, so every worker picks one at startup
-    with Pool(processes=n_processes, initializer=init_worker, initargs=(agent,)) as pool:
+    with Pool(
+        processes=n_processes, initializer=init_worker, initargs=(agent,)
+    ) as pool:
         # We only map the POPULATION. The tasks are already fixed in the workers.
-        rewards_list = pool.map(evaluate_individual, population)
-    
+        rewards_list = list(
+            tqdm(
+                pool.imap(evaluate_individual, population),
+                total=len(population),
+                desc="Evaluating",
+                unit="ind",
+            )
+        )
+
     worker_task = None
-        
+
     return np.array(rewards_list)
