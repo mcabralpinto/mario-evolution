@@ -6,4 +6,4 @@ services:
       - "3000:3000"
       - "4242-4252:4242-4252"
     container_name: supermarioserver
-    restart: "no" # Simulates --rm by not restarting the container
+    restart: "no" 

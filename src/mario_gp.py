@@ -8,6 +8,7 @@ import copy
 import argparse
 import datetime
 from pathlib import Path
+from typing import Any, cast
 
 from src.evaluation import evaluate, evaluate_population
 import src.marioai as marioai
@@ -66,20 +67,27 @@ def indent(text):
     return "\n".join("    " + line for line in text.split("\n"))
 
 BASE_FUNCTION = """def corre(action, landscape, enemies, can_jump, on_ground, Mario, Sprite, **kwargs):
-    # INDIVIDUAL GENERATED CODE vvv
 """
 
 
 # -----------------------------------------------------------------------------
 # 1. TYPE DEFINITIONS (Stripped Down)
 # -----------------------------------------------------------------------------
+class Program:
+    pass
+
+class Stmt:
+    pass
+
 class Expr:
     pass
 
 
-class Condition:
+class Cond:
     pass
 
+class Comparator:
+    pass
 
 class Key:
     pass
@@ -101,101 +109,93 @@ class TileValue:
     pass
 
 
-# -----------------------------------------------------------------------------
-# 2. PRIMITIVES: STRING BUILDERS
-# -----------------------------------------------------------------------------
-def str_if_else(cond, expr_true, expr_false):
-    return f"if {cond}:\n{indent(expr_true)}\nelse:\n{indent(expr_false)}"
+def prog_seq(stmt, program_tail):
+    stmt = stmt.rstrip()
+    program_tail = program_tail.rstrip()
+    if not program_tail:
+        return stmt
+    return f"{stmt}\n{program_tail}"
 
 
-def str_sequence(expr1, expr2):
-    return f"{expr1}\n{expr2}"
+def stmt_if_else(cond, stmt_true, stmt_false):
+    return f"if {cond}:\n{indent(stmt_true)}\nelse:\n{indent(stmt_false)}"
 
-def str_action_press(key):
-    return f"action[{key}] = 1"
 
-def str_and(cond1, cond2):
+def stmt_action_assign(key, value):
+    return f"action[{key}] = {value}"
+
+
+def stmt_pass():
+    return "pass"
+
+
+def cond_and(cond1, cond2):
     return f"({cond1} and {cond2})"
 
 
-def str_or(cond1, cond2):
+def cond_or(cond1, cond2):
     return f"({cond1} or {cond2})"
 
 
-def str_not(cond):
+def cond_not(cond):
     return f"(not {cond})"
 
-def str_check_enemy(posx, posy, comp, enemy_type):
-    ''' 
-        The goal is to make Mario enemy-aware.
-        Currently, posx and posy can be seen as the 
-        radius around Mario to check for enemies.
-        Comp is a comparator like <, >, == to compare the count of enemies in that radius to a threshold.
-        Enemy_type can be used to specify different types of enemies 
-    '''
-    # Enemies arrive as (x, y, kind) tuples relative to Mario.
-    # Keep this a pure boolean expression because it is embedded inside if/and/or trees.
+
+def cond_check_enemy(posx, posy, comp, enemy_type):
     return (
-        f"any((ek == {enemy_type}) and "
+        f"any((ek {comp} {enemy_type}) and "
         f"(abs(ex) <= {max(1, abs(posx)) * 16}) and "
         f"(abs(ey) <= {max(1, abs(posy)) * 16}) "
         f"for ex, ey, ek in enemies)"
     )
 
-def str_check_obstacle(pos_x, pos_y, comp, obstacle_value):
-    """
-    Same as above but for obstacles in the landscape.
-    """
-    x = 11 + pos_x
-    y = 11 + pos_y
-    # Guard against missing observations and invalid indexes.
+
+def cond_check_obstacle(posx, posy, comp, obstacle_value):
+    x = 11 + posx
+    y = 11 + posy
     return (
-        f"(landscape is not None and 0 <= {y} < landscape.shape[0] and "
-        f"0 <= {x} < landscape.shape[1] and landscape[{y}, {x}] {comp} {obstacle_value})"
+        f"(landscape is not None and "
+        f"0 <= {y} < landscape.shape[0] and "
+        f"0 <= {x} < landscape.shape[1] and "
+        f"landscape[{y}, {x}] {comp} {obstacle_value})"
     )
 
-def str_distance_to_enemy(enemy_type):
-    """
-    Heuristic to compute distance to the nearest enemy of a given type.
-    enemy_type: Integer enemy type.
-    """
-    return (
-        f"any((ek == {enemy_type}) and (abs(ex) <= 32) and (abs(ey) <= 32) "
-        f"for ex, ey, ek in enemies)"
-    )
 
-def str_gap_ahead():
-    return "landscape[11,12] == 0 and landscape[12,12] == 0"
+def cond_gap_ahead():
+    return "(landscape is not None and landscape[11, 12] == 0 and landscape[12, 12] == 0)"
+
 
 # -----------------------------------------------------------------------------
 # 3. GRAMMAR CONFIGURATION
 # -----------------------------------------------------------------------------
-pset = gp.PrimitiveSetTyped("MAIN", [], Expr)
-pset.addTerminal("pass", Expr, name="Pass")
-# Core Logic
-pset.addPrimitive(str_if_else, [Condition, Expr, Expr], Expr)
-pset.addPrimitive(str_sequence, [Expr, Expr], Expr)
-pset.addPrimitive(str_action_press, [Key], Expr)
+pset = gp.PrimitiveSetTyped("MAIN", [], Program)
 
-# Boolean Logic
-pset.addPrimitive(str_and, [Condition, Condition], Condition, name="AND")
-pset.addPrimitive(str_or, [Condition, Condition], Condition, name="OR")
-pset.addPrimitive(str_not, [Condition], Condition, name="NOT")
-pset.addPrimitive(str_check_enemy, [Offset, Offset, str, EnemyKind], Condition, name="CheckEnemy")
-pset.addPrimitive(str_check_obstacle, [Offset, Offset, str, TileValue], Condition, name="CheckObstacle")
-pset.addPrimitive(str_distance_to_enemy, [EnemyKind], Condition, name="DistanceToEnemy")
-pset.addPrimitive(str_gap_ahead, [], Condition, name="GapAhead")
+# Program structure
+pset.addTerminal("pass", Program, name="END")
+pset.addPrimitive(prog_seq, [Stmt, Program], Program, name="SEQ")
 
-# Senses (Mapped to variables in corre function)
-pset.addTerminal("on_ground", Condition, name="IsMarioOnGround")
-pset.addTerminal("can_jump", Condition, name="MayMarioJump")
-# Position Terminals (relative to Mario at [11,11])
-position_values = [-3, 0, 3]
+# Statements
+pset.addPrimitive(stmt_if_else, [Cond, Stmt, Stmt], Stmt, name="IF")
+pset.addPrimitive(stmt_action_assign, [Key, Bool], Stmt, name="SET_ACTION")
+pset.addPrimitive(stmt_pass, [], Stmt, name="PASS_STMT")
+
+# Boolean logic
+pset.addPrimitive(cond_and, [Cond, Cond], Cond, name="AND")
+pset.addPrimitive(cond_or, [Cond, Cond], Cond, name="OR")
+pset.addPrimitive(cond_not, [Cond], Cond, name="NOT")
+pset.addPrimitive(cond_check_enemy, [Offset, Offset, Comparator, EnemyKind], Cond, name="CheckEnemy")
+pset.addPrimitive(cond_check_obstacle, [Offset, Offset, Comparator, TileValue], Cond, name="CheckObstacle")
+pset.addPrimitive(cond_gap_ahead, [], Cond, name="GapAhead")
+
+# Senses
+pset.addTerminal("on_ground", Cond, name="IsMarioOnGround")
+pset.addTerminal("can_jump", Cond, name="MayMarioJump")
+
+# Position terminals
+position_values = [-3, -2, -1, 0, 1, 2, 3]
 
 
 def int_terminal_name(prefix, value):
-    # DEAP terminal names are used as Python identifiers in compiled expressions.
-    # Negative values like -1 must not produce names such as X_-1.
     if value < 0:
         return f"{prefix}_NEG{abs(value)}"
     return f"{prefix}_{value}"
@@ -207,20 +207,16 @@ for x in position_values:
 for y in position_values:
     pset.addTerminal(y, Offset, name=int_terminal_name("Y", y))
 
-# Or if you want them combined:
-for val in position_values:
-    pset.addTerminal(val, Offset, name=int_terminal_name("POS", val))
+# Comparators
+pset.addTerminal("==", Comparator, name="EQ")
+pset.addTerminal("!=", Comparator, name="NE")
+pset.addTerminal("<", Comparator, name="LT")
+pset.addTerminal(">", Comparator, name="GT")
 
-# Comparator Terminals
-pset.addTerminal("==", str, name="EQ")
-pset.addTerminal("!=", str, name="NE")
-pset.addTerminal("<", str, name="LT")
-pset.addTerminal(">", str, name="GT")
-
-# Enemy Type Terminals (from Table 1)
+# Enemy types
 enemy_types = {
     2: "GOOMBA",
-    3: "GOOMBA_WINGED", 
+    3: "GOOMBA_WINGED",
     4: "RED_KOOPA",
     5: "RED_KOOPA_WINGED",
     6: "GREEN_KOOPA",
@@ -229,28 +225,44 @@ enemy_types = {
     9: "SPIKY",
     10: "SPIKY_WINGED",
     12: "PIRANHA_FLOWER",
-    13: "SHELL"
+    13: "SHELL",
 }
 
 for value, name in enemy_types.items():
     pset.addTerminal(value, EnemyKind, name=name)
 
-# Obstacle Value Terminals
+# Obstacle values
 obstacle_values = {
     -11: "SOFT_OBSTACLE",
     -10: "HARD_OBSTACLE",
     0: "EMPTY_SPACE",
+    1: "MARIO_TILE",
+    2: "GOOMBA_TILE",
+    3: "GOOMBA_WINGED_TILE",
+    4: "RED_KOOPA_TILE",
+    5: "RED_KOOPA_WINGED_TILE",
+    6: "GREEN_KOOPA_TILE",
+    7: "GREEN_KOOPA_WINGED_TILE",
+    8: "BULLET_BILL_TILE",
+    9: "SPIKY_TILE",
+    10: "SPIKY_WINGED_TILE",
+    12: "PIRANHA_FLOWER_TILE",
+    13: "SHELL_TILE",
+    14: "MUSHROOM_TILE",
+    15: "FIRE_FLOWER_TILE",
     16: "BRICK",
     20: "ENEMY_OBSTACLE",
-    21: "QUESTION_BRICK"
+    21: "QUESTION_BRICK",
+    25: "PROJECTILE_TILE",
+    42: "UNDEFINED_TILE",
 }
 
 for value, name in obstacle_values.items():
     pset.addTerminal(value, TileValue, name=name)
 
-# Boolean Terminals
-pset.addTerminal(True, Bool, name="TRUE")
-pset.addTerminal(False, Bool, name="FALSE")
+# Boolean literals for action assignments
+pset.addTerminal(True, Bool, name="1")
+pset.addTerminal(False, Bool, name="0")
 
 # Actions
 pset.addTerminal("Mario.KEY_RIGHT", Key, name="RIGHT")
@@ -265,10 +277,12 @@ pset.addTerminal("Mario.KEY_DOWN", Key, name="DOWN")
 # -----------------------------------------------------------------------------
 creator.create("FitnessMax", base.Fitness, weights=(1.0,))
 creator.create("Individual", gp.PrimitiveTree, fitness=creator.FitnessMax)
+FitnessMax = cast(type[base.Fitness], creator.FitnessMax)
+Individual = cast(type[gp.PrimitiveTree], creator.Individual)
 
-toolbox = base.Toolbox()
+toolbox: Any = base.Toolbox()
 toolbox.register("expr", safe_gen_grow, pset=pset, min_=3, max_=10)
-toolbox.register("individual", tools.initIterate, creator.Individual, toolbox.expr)
+toolbox.register("individual", tools.initIterate, Individual, toolbox.expr)
 toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 toolbox.register("compile", gp.compile, pset=pset)
 
