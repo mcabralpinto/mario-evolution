@@ -14,14 +14,14 @@ N_PROCESSES = 5
 TASK_TO_SOLVE = HunterTask
 
 COIN_WEIGHT = 10
-WIN_REWARD = 200.0
-LOSE_PENALTY = -50.0
+WIN_REWARD = 10000.0
+LOSE_PENALTY = -WIN_REWARD / 2
 
 
 port_list = [4242 + i for i in range(N_PROCESSES)]
 
 
-def evaluate_agent(agent, task: Task, episodes=3):
+def evaluate_agent(agent, task: Task, episodes=5):
     """
     Evaluates the agent on the task for a given number of episodes.
     Returns the average fitness (reward).
@@ -43,9 +43,9 @@ def evaluate_agent(agent, task: Task, episodes=3):
             episode_reward += task.cum_reward
             # episode_reward += task.coins * COIN_WEIGHT
             if task.status == 1:
-                episode_reward += WIN_REWARD
-            else:
-                episode_reward += LOSE_PENALTY
+                episode_reward += WIN_REWARD * task.level_difficulty
+            # else:
+            #     episode_reward += LOSE_PENALTY
 
             if task.status == 1:  # WIN
                 task.level_difficulty += 1
@@ -59,8 +59,8 @@ def evaluate_agent(agent, task: Task, episodes=3):
 
 # --- GLOBAL VARIABLES FOR WORKER PROCESSES ---
 # These exist independently inside EACH worker process.
-worker_task = None
-worker_agent = None
+worker_task: Task = None
+worker_agent: CodeAgent = None
 
 
 def init_worker(agent_class):

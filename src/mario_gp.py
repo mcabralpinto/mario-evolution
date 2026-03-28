@@ -155,7 +155,7 @@ def cond_not(cond):
 def cond_check_enemy_ahead(comp, enemy_type):
     # if there's an enemy in a 3x3 area ahead of Mario (including diagonals)
     mario_x, mario_y = 11, 11
-    return f"enemies is not None and any((ek {comp} {enemy_type}) and (abs(ex - {mario_x}) <= 3) and (abs(ey - {mario_y}) <= 3) for ex, ey, ek in enemies)"
+    return f"enemies and any((ek {comp} {enemy_type}) and (abs(ex - {mario_x}) <= 3) and (abs(ey - {mario_y}) <= 3) for ex, ey, ek in enemies)"
 
 def cond_check_obstacle(posx, posy, comp, obstacle_value):
     x = 11 + posx
@@ -179,6 +179,16 @@ def cond_gap_ahead(blocks_ahead):
         f"all(landscape[y, {target_x}] == 0 for y in range({mario_y}, landscape.shape[0])))"
     )
 
+def cond_check_any_enemy():
+    return "(enemies and any((int(ek) in list(range(2, 14))) and (ex - mario_pos[0] <= 30.0) for ek, ex, ey in enemies))"
+
+
+def cond_hole():
+    return ("(all(landscape[y, 12] == 0 for y in range(12, 22)) or "
+           "all(landscape[y, 13] == 0 for y in range(12, 22)))")
+
+def cond_wall():
+    return ("(any(landscape[x, y] in [-10, 16, 20, 21] for y in range(11, 14) for x in range(9, 12)))")
 
 # -----------------------------------------------------------------------------
 # 3. GRAMMAR CONFIGURATION
@@ -201,6 +211,9 @@ pset.addPrimitive(cond_not, [Cond], Cond, name="NOT")
 pset.addPrimitive(cond_check_enemy_ahead, [Comparator, EnemyKind], Cond, name="CheckEnemy")
 pset.addPrimitive(cond_check_obstacle, [Offset, Offset, Comparator, TileValue], Cond, name="CheckObstacle")
 pset.addPrimitive(cond_gap_ahead, [Offset], Cond, name="GapAhead")
+pset.addPrimitive(cond_check_any_enemy, [], Cond, name="CheckAnyEnemy")
+pset.addPrimitive(cond_hole, [], Cond, name="HoleAhead")
+pset.addPrimitive(cond_wall, [], Cond, name="WallAhead")
 
 # Senses
 pset.addTerminal("on_ground", Cond, name="IsMarioOnGround")
@@ -379,21 +392,13 @@ if __name__ == "__main__":
             
             for ind, fit in zip(pop, fitnesses):
                 # Parsimony Pressure: Penalize large trees to fight bloat
-                fit -= len(ind) * 0.01 # Adjust this weight based on performance
+                # fit -= len(ind) * 0.01 # Adjust this weight based on performance
                 ind.fitness.values = (fit,)
             
             hof.update(pop)
             record = stats.compile(pop)
-            print(f"Stats:")
-            for key, value in record.items():
-                print(f"  {key}: {value}")
+            print(f"\033[91mMax:\033[0m {record['max']:.3f}, \033[94mMin:\033[0m {record['min']:.3f}, \033[92mAvg:\033[0m {record['avg']:.3f}, \033[93mStd:\033[0m {record['std']:.3f}")
 
-                for ind, fit in zip(pop, fitnesses):
-                    ind.fitness.values = (fit,)
-
-                hof.update(pop)
-                record = stats.compile(pop)
-                print(f"Stats: {record}")
     else:
         print(f"Starting Evolution: {NGEN} generations, Population size {args.pop}")
 
@@ -406,12 +411,12 @@ if __name__ == "__main__":
             
             for ind, fit in zip(pop, fitnesses):
                 # Parsimony Pressure: Penalize large trees to fight bloat
-                fit -= len(ind) * 0.01 # Adjust this weight based on performance
+                #fit -= len(ind) * 0.01 # Adjust this weight based on performance
                 ind.fitness.values = (fit,)
             
             hof.update(pop)
             record = stats.compile(pop)
-            print(f"Stats: {record}")
+            print(f"\033[91mMax:\033[0m {record['max']:.3f}, \033[94mMin:\033[0m {record['min']:.3f}, \033[92mAvg:\033[0m {record['avg']:.3f}, \033[93mStd:\033[0m {record['std']:.3f}")
 
             # Select the next generation individuals
             offspring = toolbox.select(pop, len(pop))
@@ -435,11 +440,7 @@ if __name__ == "__main__":
             # Replace population
             pop[:] = offspring
 
-        # Elitism: Ensure the best individual survives
-        if len(hof) > 0:
-            pop[0] = toolbox.clone(hof[0])
-
-        print(f"Best fitness in Generation {gen}: {hof[0].fitness.values[0] if hof[0].fitness.valid else 'N/A'}")
+        print(f"Best fitness in Generation {NGEN}: {hof[0].fitness.values[0] if hof[0].fitness.valid else 'N/A'}")
         print(f"Best Ind. Height: {hof[0].height}, Size: {len(hof[0])}")
         print("Best Code Structure:")
         print(best_individual_code(hof[0], toolbox))
