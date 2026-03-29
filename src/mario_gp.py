@@ -10,7 +10,7 @@ import datetime
 from pathlib import Path
 from typing import Any, cast
 
-from src.evaluation import evaluate, evaluate_population
+from src.evaluation import evaluate, evaluate_population, close_evaluation_pool
 import src.marioai as marioai
 from src.agents import CodeAgent, Mario, Sprite
 from deap import base, creator, tools, gp
@@ -306,6 +306,20 @@ def compile_individual(individual):
     return full_code_str
 
 
+def evaluate_invalid_individuals(population, generation):
+    """Evaluate only individuals with invalid fitness and update them in-place."""
+    invalid_entries = [(idx, ind) for idx, ind in enumerate(population) if not ind.fitness.valid]
+    if not invalid_entries:
+        return
+
+    invalid_indices = [idx for idx, _ in invalid_entries]
+    compiled_invalid = [compile_individual(ind) for _, ind in invalid_entries]
+    fitnesses = evaluate_population(CodeAgent, compiled_invalid, generation=generation)
+
+    for idx, fit in zip(invalid_indices, fitnesses):
+        population[idx].fitness.values = (fit,)
+
+
 # -----------------------------------------------------------------------------
 # 5. PERSISTENCE HELPERS
 # -----------------------------------------------------------------------------
@@ -378,7 +392,8 @@ if __name__ == "__main__":
 
     # Evolutionary Algorithm
     NGEN = args.gen
-    CXPB, MUTPB = 0.65, 0.35
+    CXPB, MUTPB = 0.8, 0.3
+    ELITISM = False
 
     if args.mode == "random":
         print(f"Starting Random Search: {NGEN} generations, Population size {args.pop}")
@@ -402,43 +417,40 @@ if __name__ == "__main__":
     else:
         print(f"Starting Evolution: {NGEN} generations, Population size {args.pop}")
 
-        for gen in range(NGEN):
-            print(f"\n--- Generation {gen} ---")
-            
-            # Parallel evaluation
-            compiled_pop = [compile_individual(ind) for ind in pop]
-            fitnesses = evaluate_population(CodeAgent, compiled_pop, generation=gen)
-            
-            for ind, fit in zip(pop, fitnesses):
-                # Parsimony Pressure: Penalize large trees to fight bloat
-                #fit -= len(ind) * 0.01 # Adjust this weight based on performance
-                ind.fitness.values = (fit,)
-            
-            hof.update(pop)
-            record = stats.compile(pop)
-            print(f"\033[91mMax:\033[0m {record['max']:.3f}, \033[94mMin:\033[0m {record['min']:.3f}, \033[92mAvg:\033[0m {record['avg']:.3f}, \033[93mStd:\033[0m {record['std']:.3f}")
+        try:
+            for gen in range(NGEN):
+                print(f"\n--- Generation {gen} ---")
 
-            # Select the next generation individuals
-            offspring = toolbox.select(pop, len(pop))
-            offspring = list(map(toolbox.clone, offspring))
+                # Parallel evaluation (only individuals modified by variation)
+                evaluate_invalid_individuals(pop, generation=gen)
 
-            # Apply crossover and mutation
-            for child1, child2 in zip(offspring[::2], offspring[1::2]):
-                if random.random() < CXPB:
-                    toolbox.mate(child1, child2)
-                    del child1.fitness.values
-                    del child2.fitness.values
+                hof.update(pop)
+                record = stats.compile(pop)
+                print(f"\033[91mMax:\033[0m {record['max']:.3f}, \033[94mMin:\033[0m {record['min']:.3f}, \033[92mAvg:\033[0m {record['avg']:.3f}, \033[93mStd:\033[0m {record['std']:.3f}")
 
-            for mutant in offspring:
-                if random.random() < MUTPB:
-                    toolbox.mutate(mutant)
-                    del mutant.fitness.values
+                # Select the next generation individuals
+                offspring = toolbox.select(pop, len(pop))
+                offspring = list(map(toolbox.clone, offspring))
 
-            if len(hof) > 0:
-                offspring[0] = toolbox.clone(hof[0])
+                # Apply crossover and mutation
+                for child1, child2 in zip(offspring[::2], offspring[1::2]):
+                    if random.random() < CXPB:
+                        toolbox.mate(child1, child2)
+                        del child1.fitness.values
+                        del child2.fitness.values
 
-            # Replace population
-            pop[:] = offspring
+                for mutant in offspring:
+                    if random.random() < MUTPB:
+                        toolbox.mutate(mutant)
+                        del mutant.fitness.values
+
+                if len(hof) > 0 and ELITISM:
+                    offspring[0] = toolbox.clone(hof[0])
+
+                # Replace population
+                pop[:] = offspring
+        finally:
+            close_evaluation_pool()
 
         print(f"Best fitness in Generation {NGEN}: {hof[0].fitness.values[0] if hof[0].fitness.valid else 'N/A'}")
         print(f"Best Ind. Height: {hof[0].height}, Size: {len(hof[0])}")

@@ -12,7 +12,7 @@ class MoveForwardTask(Task):
         self.no_progress_steps = 0
         self.total_reward = 0
 
-    def compute_reward(self, current_obs, last_obs, generation=0):
+    def compute_reward(self, current_obs, last_obs):
         if last_obs is None:
             return 0.0
 

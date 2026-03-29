@@ -1,12 +1,12 @@
 from src.marioai.experiment import Experiment
 from src.marioai.task import Task
-from multiprocessing import Pool, Manager, current_process
-from itertools import cycle
+from multiprocessing import Pool
 from src.agents import MLPAgent, CodeAgent
 from src.tasks import MoveForwardTask, HunterTask
 import numpy as np
 import random
 from tqdm import tqdm
+import atexit
 
 # Variable that configures the number of parallel processes
 N_PROCESSES = 10
@@ -16,12 +16,14 @@ TASK_TO_SOLVE = HunterTask
 COIN_WEIGHT = 10
 WIN_REWARD = 10000.0
 LOSE_PENALTY = -WIN_REWARD / 2
+N_EVAL_SEEDS = 3
+N_EVAL_DIFFICULTIES = 5
 
 
 port_list = [4242 + i for i in range(N_PROCESSES)]
 
 
-def evaluate_agent(agent, task: Task, episodes=5):
+def evaluate_agent(agent, task: Task, episodes=N_EVAL_SEEDS):
     """
     Evaluates the agent on the task for a given number of episodes.
     Returns the average fitness (reward).
@@ -30,24 +32,26 @@ def evaluate_agent(agent, task: Task, episodes=5):
     # Speed up simulation for training
     exp.max_fps = -1
 
-    total_reward = 0
+    total_reward = 0.0
 
     for i in range(episodes):
-        episode_reward = 0
-        # Randomize level layout so GP does not overfit a single "always right" map.
-        # task.env.level_seed = random.randint(1, 5)
-        task.env.level_seed = i
-        # Try up to 3 levels of increasing difficulty
-        for _ in range(3):
-            rewards = exp.doEpisodes(1)
-            episode_reward += task.cum_reward
-            # episode_reward += task.coins * COIN_WEIGHT
+        seed_reward = 0.0
+        #task.env.level_seed = random.randint(1, 5)
+        task.env.level_seed = i + 1
+
+        # Progress through increasing difficulty on the same seed.
+        for difficulty in range(N_EVAL_DIFFICULTIES):
+            task.level_difficulty = difficulty
+            exp.doEpisodes(1)
+            seed_reward += task.cum_reward
+
             if task.status == 1:
-                episode_reward += WIN_REWARD
+                seed_reward += WIN_REWARD
             else:
+                # Early-stop this seed if the agent cannot clear current difficulty.
                 break
 
-        total_reward += episode_reward
+        total_reward += seed_reward
 
     return total_reward / episodes
 
@@ -56,6 +60,10 @@ def evaluate_agent(agent, task: Task, episodes=5):
 # These exist independently inside EACH worker process.
 worker_task: Task = None
 worker_agent: CodeAgent = None
+
+# Reused in the parent process to avoid re-spawning workers every generation.
+_pool = None
+_pool_agent_class = None
 
 
 def init_worker(agent_class):
@@ -118,27 +126,47 @@ def evaluate(agent_class, ind_info, generation=0):
     return evaluate_individual((ind_info, generation))
 
 
+def _ensure_pool(agent):
+    """Creates a pool once and reuses it across evaluations."""
+    global _pool, _pool_agent_class
+    if _pool is None or _pool_agent_class is not agent:
+        close_evaluation_pool()
+        _pool = Pool(processes=N_PROCESSES, initializer=init_worker, initargs=(agent,))
+        _pool_agent_class = agent
+    return _pool
+
+
+def close_evaluation_pool():
+    """Closes the shared pool and releases worker resources."""
+    global _pool, _pool_agent_class
+    if _pool is not None:
+        _pool.close()
+        _pool.join()
+        _pool = None
+        _pool_agent_class = None
+
+
+atexit.register(close_evaluation_pool)
+
+
 def evaluate_population(agent, population, generation=0):
-
-    # Match processes to tasks to avoid one worker being idle or double-booking
-    n_processes = N_PROCESSES
-
     # Pair each individual with the current generation number
     population_with_gen = [(ind, generation) for ind in population]
 
-    # We pass 'tasks' to the initializer, so every worker picks one at startup
-    with Pool(
-        processes=n_processes, initializer=init_worker, initargs=(agent,)
-    ) as pool:
-        # We only map the POPULATION. The tasks are already fixed in the workers.
-        rewards_list = list(
-            tqdm(
-                pool.imap(evaluate_individual, population_with_gen),
-                total=len(population),
-                desc="Evaluating",
-                unit="ind",
-            )
+    if not population_with_gen:
+        return np.array([])
+
+    pool = _ensure_pool(agent)
+
+    # We only map the POPULATION. The tasks are already fixed in the workers.
+    rewards_list = list(
+        tqdm(
+            pool.imap(evaluate_individual, population_with_gen),
+            total=len(population),
+            desc="Evaluating",
+            unit="ind",
         )
+    )
 
     worker_task = None
 

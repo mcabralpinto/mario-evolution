@@ -78,12 +78,12 @@ class Task(object):
             self.finished = True
         else:
             # Step reward
-            self.reward = self.compute_reward(sense, self.last_observation, self.generation)
+            self.reward = self.compute_reward(sense, self.last_observation)
             self.last_observation = sense
             
         return sense
 
-    def compute_reward(self, current_obs, last_obs, generation=0):
+    def compute_reward(self, current_obs, last_obs):
         """
         Compute reward based on current and previous observations.
         You can override this or modify it to include more complex signals.
