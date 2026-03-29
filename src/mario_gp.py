@@ -388,7 +388,7 @@ if __name__ == "__main__":
             
             # Parallel evaluation
             compiled_pop = [compile_individual(ind) for ind in pop]
-            fitnesses = evaluate_population(CodeAgent, compiled_pop)
+            fitnesses = evaluate_population(CodeAgent, compiled_pop, generation=gen)
             
             for ind, fit in zip(pop, fitnesses):
                 # Parsimony Pressure: Penalize large trees to fight bloat
@@ -407,7 +407,7 @@ if __name__ == "__main__":
             
             # Parallel evaluation
             compiled_pop = [compile_individual(ind) for ind in pop]
-            fitnesses = evaluate_population(CodeAgent, compiled_pop)
+            fitnesses = evaluate_population(CodeAgent, compiled_pop, generation=gen)
             
             for ind, fit in zip(pop, fitnesses):
                 # Parsimony Pressure: Penalize large trees to fight bloat

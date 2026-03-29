@@ -11,4 +11,7 @@ coin reward
 
 perception changing
 
-mencionar chatice do jump (é preciso tirar e voltar a por!)
+mencionar chatice do jump (é preciso tirar e voltar a por!)~
+
+always jumping -> discount air time - too punitive! marios don't learn to jump.
+-> curriculum (good results. passes 2 levels)

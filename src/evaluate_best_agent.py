@@ -37,25 +37,17 @@ def evaluate_code_agent(suffix=""):
     agent.action_function = action
     task = HunterTask(visualization=True, port=4243, init_mario_mode=0, level_difficulty=0)
     exp = marioai.Experiment(task, agent)
-    exp.max_fps = 60
-    task.env.level_type = 0
-    rewards = sum(exp.doEpisodes()[0])
 
-    task.level_difficulty += 1
-    print(task.level_difficulty)
-    exp.max_fps = 60
-    task.env.level_type = 0
-    rewards += sum(exp.doEpisodes()[0])
-
-    task.level_difficulty += 1
-    print(task.level_difficulty)
-    exp.max_fps = 60
-    task.env.level_type = 0
-    rewards += sum(exp.doEpisodes()[0])
-    
-    
-    
-    print(rewards)
+    rewards = 0
+    for _ in range(5):
+        print(task.level_difficulty, end=": ", flush=True)
+        exp.max_fps = 60
+        task.env.level_type = 0
+        ep_reward = sum(exp.doEpisodes()[0])
+        task.level_difficulty += 1
+        print(ep_reward, flush=True)
+        rewards += ep_reward
+    print(f"Total rewards: {rewards}")
 
 
 

@@ -37,6 +37,7 @@ class Task(object):
         self.samples = 0
         self.coins = 0
         self.last_observation = None
+        self.generation = 0
 
     def reset(self):
         '''Reinitialize the environment.'''
@@ -77,18 +78,19 @@ class Task(object):
             self.finished = True
         else:
             # Step reward
-            self.reward = self.compute_reward(sense, self.last_observation)
+            self.reward = self.compute_reward(sense, self.last_observation, self.generation)
             self.last_observation = sense
             
         return sense
 
-    def compute_reward(self, current_obs, last_obs):
+    def compute_reward(self, current_obs, last_obs, generation=0):
         """
         Compute reward based on current and previous observations.
         You can override this or modify it to include more complex signals.
+        The generation parameter enables curriculum learning (reward scheduling).
         """
         reward = 0
-        
+
         return reward
 
     def perform_action(self, action):

@@ -9,7 +9,7 @@ import random
 from tqdm import tqdm
 
 # Variable that configures the number of parallel processes
-N_PROCESSES = 5
+N_PROCESSES = 10
 # Task Definition
 TASK_TO_SOLVE = HunterTask
 
@@ -32,23 +32,18 @@ def evaluate_agent(agent, task: Task, episodes=5):
 
     total_reward = 0
 
-    for _ in range(episodes):
+    for i in range(episodes):
         episode_reward = 0
         # Randomize level layout so GP does not overfit a single "always right" map.
-        task.env.level_seed = random.randint(1, 5)
-        task.level_difficulty = 0
+        # task.env.level_seed = random.randint(1, 5)
+        task.env.level_seed = i
         # Try up to 3 levels of increasing difficulty
         for _ in range(3):
             rewards = exp.doEpisodes(1)
             episode_reward += task.cum_reward
             # episode_reward += task.coins * COIN_WEIGHT
             if task.status == 1:
-                episode_reward += WIN_REWARD * task.level_difficulty
-            # else:
-            #     episode_reward += LOSE_PENALTY
-
-            if task.status == 1:  # WIN
-                task.level_difficulty += 1
+                episode_reward += WIN_REWARD
             else:
                 break
 
@@ -90,14 +85,18 @@ def evaluate_individual(ind_info):
     """
     This runs for every individual in the population.
     It uses the GLOBALLY cached worker_task.
+    ind_info is a tuple of (individual, generation).
     """
     global worker_task, worker_agent
 
+    ind, generation = ind_info
+    worker_task.generation = generation
+
     # 1. Update the persistent agent with the new DNA
     if isinstance(worker_agent, MLPAgent):
-        worker_agent.set_param_vector(ind_info)
+        worker_agent.set_param_vector(ind)
     elif isinstance(worker_agent, CodeAgent):
-        worker_agent.action_function = ind_info
+        worker_agent.action_function = ind
 
     # 2. Run evaluation using the EXISTING connection
     # No "with", no "connect", just use the persistent object.
@@ -110,19 +109,22 @@ def evaluate_individual(ind_info):
     return reward
 
 
-def evaluate(agent_class, ind_info):
+def evaluate(agent_class, ind_info, generation=0):
     global worker_agent, worker_task
     if worker_agent is None:
         worker_agent = agent_class()
     if worker_task is None:
         worker_task = TASK_TO_SOLVE(visualization=False, port=port_list[0])
-    return evaluate_individual(ind_info)
+    return evaluate_individual((ind_info, generation))
 
 
-def evaluate_population(agent, population):
+def evaluate_population(agent, population, generation=0):
 
     # Match processes to tasks to avoid one worker being idle or double-booking
     n_processes = N_PROCESSES
+
+    # Pair each individual with the current generation number
+    population_with_gen = [(ind, generation) for ind in population]
 
     # We pass 'tasks' to the initializer, so every worker picks one at startup
     with Pool(
@@ -131,7 +133,7 @@ def evaluate_population(agent, population):
         # We only map the POPULATION. The tasks are already fixed in the workers.
         rewards_list = list(
             tqdm(
-                pool.imap(evaluate_individual, population),
+                pool.imap(evaluate_individual, population_with_gen),
                 total=len(population),
                 desc="Evaluating",
                 unit="ind",
