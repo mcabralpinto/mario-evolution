@@ -10,7 +10,7 @@ import datetime
 from pathlib import Path
 from typing import Any, cast
 
-from src.evaluation import evaluate, evaluate_population, close_evaluation_pool
+from src.evaluation import evaluate, evaluate_population, close_evaluation_pool, set_total_generations
 import src.marioai as marioai
 from src.agents import CodeAgent, Mario, Sprite
 from deap import base, creator, tools, gp
@@ -152,35 +152,35 @@ def cond_not(cond):
     return f"(not {cond})"
 
 
-def cond_check_enemy_ahead(comp, enemy_type):
-    # if there's an enemy in a 3x3 area ahead of Mario (including diagonals)
-    mario_x, mario_y = 11, 11
-    return f"enemies and any((ek {comp} {enemy_type}) and (abs(ex - {mario_x}) <= 3) and (abs(ey - {mario_y}) <= 3) for ex, ey, ek in enemies)"
+# def cond_check_enemy_ahead(comp, enemy_type):
+#     # if there's an enemy in a 3x3 area ahead of Mario (including diagonals)
+#     mario_x, mario_y = 11, 11
+#     return f"enemies and any((ek {comp} {enemy_type}) and (abs(ex - {mario_x}) <= 3) and (abs(ey - {mario_y}) <= 3) for ex, ey, ek in enemies)"
 
-def cond_check_obstacle(posx, posy, comp, obstacle_value):
-    x = 11 + posx
-    y = 11 + posy
-    return (
-        f"(landscape is not None and "
-        f"0 <= {y} < landscape.shape[0] and "
-        f"0 <= {x} < landscape.shape[1] and "
-        f"landscape[{y}, {x}] {comp} {obstacle_value})"
-    )
+# def cond_check_obstacle(posx, posy, comp, obstacle_value):
+#     x = 11 + posx
+#     y = 11 + posy
+#     return (
+#         f"(landscape is not None and "
+#         f"0 <= {y} < landscape.shape[0] and "
+#         f"0 <= {x} < landscape.shape[1] and "
+#         f"landscape[{y}, {x}] {comp} {obstacle_value})"
+#     )
 
 
-def cond_gap_ahead(blocks_ahead):
-    mario_x, mario_y = 11, 11
-    target_x = mario_x + blocks_ahead
+# def cond_gap_ahead(blocks_ahead):
+#     mario_x, mario_y = 11, 11
+#     target_x = mario_x + blocks_ahead
 
-    # Expression-only check so GP can inline it into conditions safely.
-    return (
-        "(landscape is not None and "
-        f"0 <= {target_x} < landscape.shape[1] and "
-        f"all(landscape[y, {target_x}] == 0 for y in range({mario_y}, landscape.shape[0])))"
-    )
+#     # Expression-only check so GP can inline it into conditions safely.
+#     return (
+#         "(landscape is not None and "
+#         f"0 <= {target_x} < landscape.shape[1] and "
+#         f"all(landscape[y, {target_x}] == 0 for y in range({mario_y}, landscape.shape[0])))"
+#     )
 
 def cond_check_any_enemy():
-    return "(enemies and any((int(ek) in list(range(2, 14))) and (ex - mario_pos[0] <= 30.0) for ek, ex, ey in enemies))"
+    return "(enemies and any((int(ek) in list(range(2, 14))) and ((-16 <= mario_pos[1] - ey <= 32) and (-32 <= ex - mario_pos[0] <= 48)) for ek, ex, ey in enemies))"
 
 
 def cond_hole():
@@ -208,9 +208,9 @@ pset.addPrimitive(stmt_action_assign, [Key, Bool], Stmt, name="SET_ACTION")
 pset.addPrimitive(cond_and, [Cond, Cond], Cond, name="AND")
 pset.addPrimitive(cond_or, [Cond, Cond], Cond, name="OR")
 pset.addPrimitive(cond_not, [Cond], Cond, name="NOT")
-pset.addPrimitive(cond_check_enemy_ahead, [Comparator, EnemyKind], Cond, name="CheckEnemy")
-pset.addPrimitive(cond_check_obstacle, [Offset, Offset, Comparator, TileValue], Cond, name="CheckObstacle")
-pset.addPrimitive(cond_gap_ahead, [Offset], Cond, name="GapAhead")
+# pset.addPrimitive(cond_check_enemy_ahead, [Comparator, EnemyKind], Cond, name="CheckEnemy")
+# pset.addPrimitive(cond_check_obstacle, [Offset, Offset, Comparator, TileValue], Cond, name="CheckObstacle")
+# pset.addPrimitive(cond_gap_ahead, [Offset], Cond, name="GapAhead")
 pset.addPrimitive(cond_check_any_enemy, [], Cond, name="CheckAnyEnemy")
 pset.addPrimitive(cond_hole, [], Cond, name="HoleAhead")
 pset.addPrimitive(cond_wall, [], Cond, name="WallAhead")
@@ -392,8 +392,9 @@ if __name__ == "__main__":
 
     # Evolutionary Algorithm
     NGEN = args.gen
-    CXPB, MUTPB = 0.8, 0.3
-    ELITISM = False
+    set_total_generations(NGEN)
+    CXPB, MUTPB = 0.5, 0.5
+    ELITISM = True
 
     if args.mode == "random":
         print(f"Starting Random Search: {NGEN} generations, Population size {args.pop}")
@@ -466,3 +467,5 @@ if __name__ == "__main__":
     best_ind = hof[0]
     print(f"\nBest Fitness Found: {best_ind.fitness.values[0]}")
     save_best_individual(best_ind, toolbox, filename_py="gp_mario_best.py")
+
+# .\env\Scripts\python.exe -m src.mario_gp --pop 100 --gen 50

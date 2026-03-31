@@ -26,9 +26,10 @@ class Task(object):
         '''Constructor.
 
         Args:
-          environment (Environment): the environment instance.
+            environment (Environment): the environment instance.
         '''
 
+        self.ngen = int(kwargs.pop("ngen", 0))
         self.env = marioai.Environment(*args, **kwargs)
         self.finished = False
         self.reward = 0

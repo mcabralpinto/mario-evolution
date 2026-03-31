@@ -2,6 +2,7 @@ from src.marioai.task import Task
 
 class HunterTask(Task):
     def __init__(self, *args, **kwargs):
+        self.is_best_eval = bool(kwargs.pop("is_best_eval", False))
         super().__init__(*args, **kwargs)
         self.name = "Hunter"
         self.total_reward = 0
@@ -17,9 +18,9 @@ class HunterTask(Task):
 
     
     def compute_reward(self, current_obs, last_obs):
-        current_x  = current_obs.mario_pos[0] if current_obs is not None else 0
-        last_x = last_obs.mario_pos[0] if last_obs is not None else current_x
-        delta_x = current_x - last_x
+        mx, my = current_obs.mario_pos
+        last_mx, last_my = last_obs.mario_pos if last_obs is not None else (mx, my)
+        delta_x = mx - last_mx
 
         stuck_penalty = 0.0
         if abs(delta_x) <= 0.61 and current_obs.may_jump:
@@ -29,7 +30,18 @@ class HunterTask(Task):
             self.no_progress_steps = 0
 
         airtime_penalty = 0.0
-        if not current_obs.on_ground and self.generation > 24:
-            airtime_penalty = -5
-            #print(f"Airtime penalty applied at generation {self.generation}")
-        return delta_x + stuck_penalty + airtime_penalty
+        if not current_obs.on_ground and (self.generation >= (self.ngen / 5) or self.is_best_eval):
+            airtime_penalty = -10
+
+        enemy_penalty = 0.0
+        for ex, ey, _ in current_obs.enemies:
+            rel_x = ex - mx  # positive = ahead
+            rel_y = ey - my  # positive = below (screen coords, y increases downward)
+            # Only penalize enemies in the danger zone: ahead and near Mario's level
+            # (~3 tiles ahead, 2 tiles above to 3 tiles below, at 16px/tile)
+            if -16 < rel_x <= 48 and 48 <= rel_y <= -32:
+                dist = max(1.0, (rel_x ** 2 + rel_y ** 2) ** 0.5)
+                enemy_penalty -= 100 / dist
+            
+
+        return delta_x + stuck_penalty + airtime_penalty + enemy_penalty

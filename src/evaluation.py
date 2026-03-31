@@ -17,10 +17,16 @@ COIN_WEIGHT = 10
 WIN_REWARD = 10000.0
 LOSE_PENALTY = -WIN_REWARD / 2
 N_EVAL_SEEDS = 3
-N_EVAL_DIFFICULTIES = 5
+MAX_EVAL_DIFFICULTIES = 5
+TOTAL_GENERATIONS = 0
 
 
 port_list = [4242 + i for i in range(N_PROCESSES)]
+
+
+def set_total_generations(ngen):
+    global TOTAL_GENERATIONS
+    TOTAL_GENERATIONS = int(ngen)
 
 
 def evaluate_agent(agent, task: Task, episodes=N_EVAL_SEEDS):
@@ -36,20 +42,27 @@ def evaluate_agent(agent, task: Task, episodes=N_EVAL_SEEDS):
 
     for i in range(episodes):
         seed_reward = 0.0
-        #task.env.level_seed = random.randint(1, 5)
+        #task.env.level_seed = random.randint(1, 100)
         task.env.level_seed = i + 1
 
         # Progress through increasing difficulty on the same seed.
-        for difficulty in range(N_EVAL_DIFFICULTIES):
+        # losses = 0
+        for difficulty in range(MAX_EVAL_DIFFICULTIES):
             task.level_difficulty = difficulty
             exp.doEpisodes(1)
             seed_reward += task.cum_reward
 
             if task.status == 1:
                 seed_reward += WIN_REWARD
-            else:
+            # else:
+            #     if task.status == -1:
+            #         break
+                    #seed_reward += LOSE_PENALTY
+                #     losses += 1
+                # if losses == 2:
+                #     break  # Early-stop this seed if the agent fails too much.
                 # Early-stop this seed if the agent cannot clear current difficulty.
-                break
+                # break
 
         total_reward += seed_reward
 
@@ -86,7 +99,13 @@ def init_worker(agent_class):
 
     worker_agent = agent_class()
     if worker_task is None:
-        worker_task = TASK_TO_SOLVE(visualization=False, port=port, init_mario_mode=0)
+        worker_task = TASK_TO_SOLVE(
+            visualization=False,
+            port=port,
+            init_mario_mode=0,
+            is_best_eval=False,
+            ngen=TOTAL_GENERATIONS,
+        )
 
 
 def evaluate_individual(ind_info):
@@ -122,7 +141,12 @@ def evaluate(agent_class, ind_info, generation=0):
     if worker_agent is None:
         worker_agent = agent_class()
     if worker_task is None:
-        worker_task = TASK_TO_SOLVE(visualization=False, port=port_list[0])
+        worker_task = TASK_TO_SOLVE(
+            visualization=False,
+            port=port_list[0],
+            is_best_eval=False,
+            ngen=TOTAL_GENERATIONS,
+        )
     return evaluate_individual((ind_info, generation))
 
 
