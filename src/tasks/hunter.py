@@ -37,11 +37,10 @@ class HunterTask(Task):
         for ex, ey, _ in current_obs.enemies:
             rel_x = ex - mx  # positive = ahead
             rel_y = ey - my  # positive = below (screen coords, y increases downward)
-            # Only penalize enemies in the danger zone: ahead and near Mario's level
-            # (~3 tiles ahead, 2 tiles above to 3 tiles below, at 16px/tile)
-            if -16 < rel_x <= 48 and 48 <= rel_y <= -32:
+            # Only penalize enemies in the danger zone: 3 blocks ahead and near Mario's level
+            if -8 < rel_x <= 48 and 16 <= rel_y <= 16:
                 dist = max(1.0, (rel_x ** 2 + rel_y ** 2) ** 0.5)
-                enemy_penalty -= 100 / dist
+                enemy_penalty -= 10 + (100 / dist)  # more penalty for closer enemies
             
 
         return delta_x + stuck_penalty + airtime_penalty + enemy_penalty

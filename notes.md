@@ -7,6 +7,7 @@
 - auxiliary perceptions (hole/obstacle/enemy ahead)
 
 - simpler versions of past perceptions (28/3)
+    - tweaked (29 - 31/3)
 
 # FITNESS
 

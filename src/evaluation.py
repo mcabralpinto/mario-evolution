@@ -16,8 +16,8 @@ TASK_TO_SOLVE = HunterTask
 COIN_WEIGHT = 10
 WIN_REWARD = 10000.0
 LOSE_PENALTY = -WIN_REWARD / 2
-N_EVAL_SEEDS = 3
-MAX_EVAL_DIFFICULTIES = 5
+N_EVAL_SEEDS = 5
+MAX_EVAL_DIFFICULTIES = 3
 TOTAL_GENERATIONS = 0
 
 
@@ -42,8 +42,8 @@ def evaluate_agent(agent, task: Task, episodes=N_EVAL_SEEDS):
 
     for i in range(episodes):
         seed_reward = 0.0
-        #task.env.level_seed = random.randint(1, 100)
-        task.env.level_seed = i + 1
+        task.env.level_seed = random.randint(1, 1000)
+        #task.env.level_seed = i + 1
 
         # Progress through increasing difficulty on the same seed.
         # losses = 0

@@ -179,13 +179,21 @@ def cond_not(cond):
 #         f"all(landscape[y, {target_x}] == 0 for y in range({mario_y}, landscape.shape[0])))"
 #     )
 
-def cond_check_any_enemy():
-    return "(enemies and any((int(ek) in list(range(2, 14))) and ((-16 <= mario_pos[1] - ey <= 32) and (-32 <= ex - mario_pos[0] <= 48)) for ek, ex, ey in enemies))"
+def cond_enemy_ahead():
+    # see if there are enemies, and if any are 3 blocks ahead of mario and within a block vertically (a common "danger zone" for simple forward movement)
+    return "(enemies and any((int(ek) in list(range(2, 14))) and ((-16 <= mario_pos[1] - ey <= 16) and (-8 <= ex - mario_pos[0] <= 48)) for ek, ex, ey in enemies))"
 
+def cond_enemy_above():
+    # see if there are enemies, and if any are 3 blocks ahead of mario and within a block vertically (a common "danger zone" for simple forward movement)
+    return "(enemies and any((int(ek) in list(range(2, 14))) and ((16 <= mario_pos[1] - ey <= 48) and (-8 <= ex - mario_pos[0] <= 48)) for ek, ex, ey in enemies))"
 
 def cond_hole():
-    return ("(all(landscape[y, 12] == 0 for y in range(12, 22)) or "
-           "all(landscape[y, 13] == 0 for y in range(12, 22)))")
+    # see if there is a gap 1 block ahead and there no is ground underneath
+    return ("(all(landscape[y, 12] == 0 for y in range(12, 22)))")
+    
+def cond_drop():
+    # see if there is a gap 1 block ahead but there is ground underneath
+    return ("(landscape[12, 12] == 0 and any(landscape[y, 12] != 0 for y in range(13, 22)))")
 
 def cond_wall():
     return ("(any(landscape[x, y] in [-10, 16, 20, 21] for y in range(11, 14) for x in range(9, 12)))")
@@ -211,8 +219,10 @@ pset.addPrimitive(cond_not, [Cond], Cond, name="NOT")
 # pset.addPrimitive(cond_check_enemy_ahead, [Comparator, EnemyKind], Cond, name="CheckEnemy")
 # pset.addPrimitive(cond_check_obstacle, [Offset, Offset, Comparator, TileValue], Cond, name="CheckObstacle")
 # pset.addPrimitive(cond_gap_ahead, [Offset], Cond, name="GapAhead")
-pset.addPrimitive(cond_check_any_enemy, [], Cond, name="CheckAnyEnemy")
+pset.addPrimitive(cond_enemy_ahead, [], Cond, name="EnemyAhead")
+pset.addPrimitive(cond_enemy_above, [], Cond, name="EnemyAbove")
 pset.addPrimitive(cond_hole, [], Cond, name="HoleAhead")
+pset.addPrimitive(cond_drop, [], Cond, name="DropAhead")
 pset.addPrimitive(cond_wall, [], Cond, name="WallAhead")
 
 # Senses
@@ -450,6 +460,10 @@ if __name__ == "__main__":
 
                 # Replace population
                 pop[:] = offspring
+                
+                for ind in pop:
+                    # invalidate all fitnesses
+                    ind.fitness.valid = False
         finally:
             close_evaluation_pool()
 
