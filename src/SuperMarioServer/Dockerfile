@@ -11,7 +11,7 @@ USER root
 # Install Java 8 (OpenJDK 8)
 # We update apt and install the JDK
 RUN apt-get update && \
-    apt-get install -y openjdk-8-jdk ant && \
+    apt-get install -y openjdk-8-jdk ant dos2unix && \
     apt-get clean
 WORKDIR /server
 # Copy project files
@@ -20,11 +20,12 @@ COPY server /server
 # 4. Permissions
 RUN chown -R 1000:1000 /server
 
-# Copy the runner script and make it executable
-COPY run-server.sh /server//run-server.sh
-RUN chmod +x /server/run-server.sh
+# Copy the runner script, normalize line endings, and make it executable
+COPY run-server.sh /server/run-server.sh
+RUN dos2unix /server/run-server.sh && chmod +x /server/run-server.sh
 
 COPY mario.desktop /etc/xdg/autostart/mario.desktop
+RUN dos2unix /etc/xdg/autostart/mario.desktop
 
 # Compile
 #RUN javac -cp "src:lib/*" -d bin src/ch/idsia/scenarios/Evolve.java
