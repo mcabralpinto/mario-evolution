@@ -30,7 +30,7 @@ class HunterTask(Task):
             self.no_progress_steps = 0
 
         airtime_penalty = 0.0
-        if not current_obs.on_ground and (self.generation >= (self.ngen / 5) or self.is_best_eval):
+        if not current_obs.on_ground and (self.generation >= (self.ngen / 2) or self.is_best_eval):
             airtime_penalty = -10
 
         enemy_penalty = 0.0

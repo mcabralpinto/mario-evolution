@@ -19,6 +19,7 @@ def corre(action, landscape, enemies, can_jump, on_ground, Mario, Sprite, mario_
         and (ex - mario_pos[0] <= 30.0)
         for ek, ex, ey in enemies
     )
+    print(enemies)
 
     # for ek, ex, ey in enemies or []:
     #     if ek in enemy_types:

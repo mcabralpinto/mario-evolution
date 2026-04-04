@@ -16,9 +16,11 @@ TASK_TO_SOLVE = HunterTask
 COIN_WEIGHT = 10
 WIN_REWARD = 10000.0
 LOSE_PENALTY = -WIN_REWARD / 2
-N_EVAL_SEEDS = 5
-MAX_EVAL_DIFFICULTIES = 3
+N_EVAL_SEEDS = 3
+MAX_EVAL_DIFFICULTIES = 5
 TOTAL_GENERATIONS = 0
+
+curr_difficulty = 0
 
 
 port_list = [4242 + i for i in range(N_PROCESSES)]
@@ -27,6 +29,10 @@ port_list = [4242 + i for i in range(N_PROCESSES)]
 def set_total_generations(ngen):
     global TOTAL_GENERATIONS
     TOTAL_GENERATIONS = int(ngen)
+    
+# def increase_difficulty():
+#     global curr_difficulty
+#     curr_difficulty += 1
 
 
 def evaluate_agent(agent, task: Task, episodes=N_EVAL_SEEDS):
@@ -34,6 +40,7 @@ def evaluate_agent(agent, task: Task, episodes=N_EVAL_SEEDS):
     Evaluates the agent on the task for a given number of episodes.
     Returns the average fitness (reward).
     """
+    #global curr_difficulty
     exp = Experiment(task, agent)
     # Speed up simulation for training
     exp.max_fps = -1
@@ -42,13 +49,13 @@ def evaluate_agent(agent, task: Task, episodes=N_EVAL_SEEDS):
 
     for i in range(episodes):
         seed_reward = 0.0
-        task.env.level_seed = random.randint(1, 1000)
-        #task.env.level_seed = i + 1
+        #task.env.level_seed = random.randint(1, 1000)
+        task.env.level_seed = i + 1
 
         # Progress through increasing difficulty on the same seed.
         # losses = 0
         for difficulty in range(MAX_EVAL_DIFFICULTIES):
-            task.level_difficulty = difficulty
+            task.level_difficulty = curr_difficulty + difficulty
             exp.doEpisodes(1)
             seed_reward += task.cum_reward
 
@@ -83,6 +90,12 @@ def init_worker(agent_class):
     """
     This runs ONCE when each worker process starts.
     """
+    import signal
+    # Workers must ignore SIGINT so only the main process handles Ctrl+C.
+    # Without this, every worker also throws KeyboardInterrupt and the pool
+    # enters a broken state that keeps propagating errors.
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+
     global worker_agent, worker_task
 
     # Each worker needs to pick a port. Since we have 10 workers
@@ -170,6 +183,16 @@ def close_evaluation_pool():
         _pool_agent_class = None
 
 
+def terminate_evaluation_pool():
+    """Terminates the pool immediately (use on interrupt to unblock imap)."""
+    global _pool, _pool_agent_class
+    if _pool is not None:
+        _pool.terminate()
+        _pool.join()
+        _pool = None
+        _pool_agent_class = None
+
+
 atexit.register(close_evaluation_pool)
 
 
@@ -183,14 +206,19 @@ def evaluate_population(agent, population, generation=0):
     pool = _ensure_pool(agent)
 
     # We only map the POPULATION. The tasks are already fixed in the workers.
-    rewards_list = list(
-        tqdm(
-            pool.imap(evaluate_individual, population_with_gen),
-            total=len(population),
-            desc="Evaluating",
-            unit="ind",
+    try:
+        rewards_list = list(
+            tqdm(
+                pool.imap(evaluate_individual, population_with_gen),
+                total=len(population),
+                desc="Evaluating",
+                unit="ind",
+            )
         )
-    )
+    except Exception:
+        # Pool was terminated (e.g. by the interrupt handler) — return empty
+        # so the caller can check the interrupt flag and exit cleanly.
+        return np.array([])
 
     worker_task = None
 

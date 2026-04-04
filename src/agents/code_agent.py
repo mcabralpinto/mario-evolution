@@ -49,7 +49,7 @@ class CodeAgent(Agent):
                         'Mario' : Mario,
                         'Sprite' : Sprite, 
                         'landscape' : self.level_scene, 
-                        'enemies' : self.enemies_floats,
+                        'enemies' : self.level_scene,
                         'can_jump' : self.can_jump,
                         'on_ground' : self.on_ground,
                         'mario_pos' : self.mario_floats

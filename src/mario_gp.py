@@ -10,7 +10,7 @@ import datetime
 from pathlib import Path
 from typing import Any, cast
 
-from src.evaluation import evaluate, evaluate_population, close_evaluation_pool, set_total_generations
+from src.evaluation import evaluate, evaluate_population, terminate_evaluation_pool, set_total_generations #, increase_difficulty
 import src.marioai as marioai
 from src.agents import CodeAgent, Mario, Sprite
 from deap import base, creator, tools, gp
@@ -179,24 +179,30 @@ def cond_not(cond):
 #         f"all(landscape[y, {target_x}] == 0 for y in range({mario_y}, landscape.shape[0])))"
 #     )
 
-def cond_enemy_ahead():
-    # see if there are enemies, and if any are 3 blocks ahead of mario and within a block vertically (a common "danger zone" for simple forward movement)
-    return "(enemies and any((int(ek) in list(range(2, 14))) and ((-16 <= mario_pos[1] - ey <= 16) and (-8 <= ex - mario_pos[0] <= 48)) for ek, ex, ey in enemies))"
+# def cond_enemy_ahead():
+#     # see if there are enemies, and if any are 3 blocks ahead of mario and within a block vertically (a common "danger zone" for simple forward movement)
+#     return "(enemies and any((int(ek) in list(range(2, 14))) and ((-16 <= mario_pos[1] - ey <= 16) and (-8 <= ex - mario_pos[0] <= 48)) for ek, ex, ey in enemies))"
 
-def cond_enemy_above():
-    # see if there are enemies, and if any are 3 blocks ahead of mario and within a block vertically (a common "danger zone" for simple forward movement)
-    return "(enemies and any((int(ek) in list(range(2, 14))) and ((16 <= mario_pos[1] - ey <= 48) and (-8 <= ex - mario_pos[0] <= 48)) for ek, ex, ey in enemies))"
+# def cond_enemy_above():
+#     # see if there are enemies, and if any are 3 blocks ahead of mario and within a block vertically (a common "danger zone" for simple forward movement)
+#     return "(enemies and any((int(ek) in list(range(2, 14))) and ((16 <= mario_pos[1] - ey <= 48) and (-8 <= ex - mario_pos[0] <= 48)) for ek, ex, ey in enemies))"
 
-def cond_hole():
-    # see if there is a gap 1 block ahead and there no is ground underneath
-    return ("(all(landscape[y, 12] == 0 for y in range(12, 22)))")
+# def cond_hole():
+#     # see if there is a gap 1 block ahead and there no is ground underneath
+#     return ("(all(landscape[y, 12] == 0 for y in range(12, 22)))")
     
-def cond_drop():
-    # see if there is a gap 1 block ahead but there is ground underneath
-    return ("(landscape[12, 12] == 0 and any(landscape[y, 12] != 0 for y in range(13, 22)))")
+# def cond_drop():
+#     # see if there is a gap 1 block ahead but there is ground underneath
+#     return ("(landscape[12, 12] == 0 and any(landscape[y, 12] != 0 for y in range(13, 22)))")
 
-def cond_wall():
-    return ("(any(landscape[x, y] in [-10, 16, 20, 21] for y in range(11, 14) for x in range(9, 12)))")
+# def cond_wall():
+#     return ("(any(landscape[x, y] in [-10, 16, 20, 21] for y in range(11, 14) for x in range(9, 12)))")
+
+def cond_check_enemy(pos_x, pos_y, comp, enemy_type):
+    return f"(enemies[11+{pos_y}][11+{pos_x}] {comp} {enemy_type})"
+
+def cond_check_landscape(pos_x, pos_y, comp, tile_value):
+    return f"(landscape[11+{pos_y}][11+{pos_x}] {comp} {tile_value})"
 
 # -----------------------------------------------------------------------------
 # 3. GRAMMAR CONFIGURATION
@@ -219,19 +225,21 @@ pset.addPrimitive(cond_not, [Cond], Cond, name="NOT")
 # pset.addPrimitive(cond_check_enemy_ahead, [Comparator, EnemyKind], Cond, name="CheckEnemy")
 # pset.addPrimitive(cond_check_obstacle, [Offset, Offset, Comparator, TileValue], Cond, name="CheckObstacle")
 # pset.addPrimitive(cond_gap_ahead, [Offset], Cond, name="GapAhead")
-pset.addPrimitive(cond_enemy_ahead, [], Cond, name="EnemyAhead")
-pset.addPrimitive(cond_enemy_above, [], Cond, name="EnemyAbove")
-pset.addPrimitive(cond_hole, [], Cond, name="HoleAhead")
-pset.addPrimitive(cond_drop, [], Cond, name="DropAhead")
-pset.addPrimitive(cond_wall, [], Cond, name="WallAhead")
+# pset.addPrimitive(cond_enemy_ahead, [], Cond, name="EnemyAhead")
+# pset.addPrimitive(cond_enemy_above, [], Cond, name="EnemyAbove")
+# pset.addPrimitive(cond_hole, [], Cond, name="HoleAhead")
+# pset.addPrimitive(cond_drop, [], Cond, name="DropAhead")
+# pset.addPrimitive(cond_wall, [], Cond, name="WallAhead")
+pset.addPrimitive(cond_check_enemy, [Offset, Offset, Comparator, EnemyKind], Cond, name="CheckEnemyAt")
+pset.addPrimitive(cond_check_landscape, [Offset, Offset, Comparator, TileValue], Cond, name="CheckLandscapeAt")
 
 # Senses
 pset.addTerminal("on_ground", Cond, name="IsMarioOnGround")
 pset.addTerminal("can_jump", Cond, name="MayMarioJump")
 
 # Position terminals
-position_values = [-3, -2, -1, 0, 1, 2, 3]
-
+# position_values = [-3, -2, -1, 0, 1, 2, 3]
+position_values = [-1, 0, 1]
 
 def int_terminal_name(prefix, value):
     if value < 0:
@@ -250,6 +258,8 @@ pset.addTerminal("==", Comparator, name="EQ")
 pset.addTerminal("!=", Comparator, name="NE")
 pset.addTerminal("<", Comparator, name="LT")
 pset.addTerminal(">", Comparator, name="GT")
+pset.addTerminal("<=", Comparator, name="LE")
+pset.addTerminal(">=", Comparator, name="GE")
 
 # Enemy types
 enemy_types = {
@@ -327,6 +337,7 @@ def evaluate_invalid_individuals(population, generation):
     fitnesses = evaluate_population(CodeAgent, compiled_invalid, generation=generation)
 
     for idx, fit in zip(invalid_indices, fitnesses):
+        fit -= len(population[idx]) * 50
         population[idx].fitness.values = (fit,)
 
 
@@ -362,6 +373,25 @@ def save_best_individual(best_ind, toolbox, filename_py=f"mario_best_{datetime.d
 
 
 # -----------------------------------------------------------------------------
+# 5b. CHECKPOINT HELPERS
+# -----------------------------------------------------------------------------
+def save_checkpoint(pop, hof, gen, args, filepath=None):
+    if filepath is None:
+        Path("data/checkpoints").mkdir(parents=True, exist_ok=True)
+        filepath = f"data/checkpoints/checkpoint_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pkl"
+    data = {"pop": pop, "hof": hof, "gen": gen, "args": args}
+    with open(filepath, "wb") as f:
+        pickle.dump(data, f)
+    print(f"Checkpoint saved to '{filepath}'")
+    return filepath
+
+
+def load_checkpoint(filepath):
+    with open(filepath, "rb") as f:
+        return pickle.load(f)
+
+
+# -----------------------------------------------------------------------------
 # 6. MAIN EXECUTION
 # -----------------------------------------------------------------------------
 if __name__ == "__main__":
@@ -376,23 +406,41 @@ if __name__ == "__main__":
         default="evolution",
         help="Search mode for GP.",
     )
+    parser.add_argument(
+        "--checkpoint",
+        type=str,
+        default=None,
+        metavar="FILE",
+        help="Resume training from a checkpoint .pkl file.",
+    )
     args = parser.parse_args()
 
     random.seed(args.seed)
-    
+
     # Genetic Operators - experiment with these values! try elitism
     toolbox.register("select", tools.selTournament, tournsize=5)
     toolbox.register("mate", gp.cxOnePoint)
-    toolbox.register("expr_mut", safe_gen_grow, pset=pset, min_=2, max_=5) 
+    toolbox.register("expr_mut", safe_gen_grow, pset=pset, min_=2, max_=5)
     toolbox.register("mutate", gp.mutUniform, expr=toolbox.expr_mut, pset=pset)
 
     # Decorators to limit tree height
-    toolbox.decorate("mate", gp.staticLimit(key=operator.attrgetter("height"), max_value=args.max_height)) 
+    toolbox.decorate("mate", gp.staticLimit(key=operator.attrgetter("height"), max_value=args.max_height))
     toolbox.decorate("mutate", gp.staticLimit(key=operator.attrgetter("height"), max_value=args.max_height))
 
-    # Population Initialization
-    pop = toolbox.population(n=args.pop)
-    hof = tools.HallOfFame(1)
+    # Population Initialization (or resume from checkpoint)
+    start_gen = 0
+    if args.checkpoint:
+        print(f"Loading checkpoint from '{args.checkpoint}'...")
+        ckpt = load_checkpoint(args.checkpoint)
+        pop = ckpt["pop"]
+        hof = ckpt["hof"]
+        start_gen = ckpt["gen"] + 1
+        print(f"Resuming from generation {start_gen}")
+        if start_gen >= args.gen:
+            print(f"Warning: checkpoint generation ({ckpt['gen']}) >= --gen ({args.gen}). No generations to run.")
+    else:
+        pop = toolbox.population(n=args.pop)
+        hof = tools.HallOfFame(1)
 
     stats = tools.Statistics(lambda ind: ind.fitness.values)
     stats.register("avg", np.mean)
@@ -409,27 +457,39 @@ if __name__ == "__main__":
     if args.mode == "random":
         print(f"Starting Random Search: {NGEN} generations, Population size {args.pop}")
 
-        for gen in range(NGEN):
-            print(f"\n--- Generation {gen} ---")
-            
-            # Parallel evaluation
-            compiled_pop = [compile_individual(ind) for ind in pop]
-            fitnesses = evaluate_population(CodeAgent, compiled_pop, generation=gen)
-            
-            for ind, fit in zip(pop, fitnesses):
-                # Parsimony Pressure: Penalize large trees to fight bloat
-                # fit -= len(ind) * 0.01 # Adjust this weight based on performance
-                ind.fitness.values = (fit,)
-            
-            hof.update(pop)
-            record = stats.compile(pop)
-            print(f"\033[91mMax:\033[0m {record['max']:.3f}, \033[94mMin:\033[0m {record['min']:.3f}, \033[92mAvg:\033[0m {record['avg']:.3f}, \033[93mStd:\033[0m {record['std']:.3f}")
+        gen = start_gen - 1
+        try:
+            for gen in range(start_gen, NGEN):
+                print(f"\n--- Generation {gen} ---")
+
+                # Parallel evaluation
+                compiled_pop = [compile_individual(ind) for ind in pop]
+                fitnesses = evaluate_population(CodeAgent, compiled_pop, generation=gen)
+
+                for ind, fit in zip(pop, fitnesses):
+                    # Parsimony Pressure: Penalize large trees to fight bloat
+                    fit -= len(ind) * 50 # Adjust this weight based on performance
+                    ind.fitness.values = (fit,)
+
+                hof.update(pop)
+                record = stats.compile(pop)
+                # if record['avg'] > 20000:
+                #     increase_difficulty()
+                #     print("Increased difficulty for next generation!")
+                print(f"\033[91mMax:\033[0m {record['max']:.3f}, \033[94mMin:\033[0m {record['min']:.3f}, \033[92mAvg:\033[0m {record['avg']:.3f}, \033[93mStd:\033[0m {record['std']:.3f}")
+
+        except KeyboardInterrupt:
+            print("\nInterrupted.")
+        finally:
+            terminate_evaluation_pool()
+            save_checkpoint(pop, hof, gen, args)
 
     else:
         print(f"Starting Evolution: {NGEN} generations, Population size {args.pop}")
 
+        gen = start_gen - 1
         try:
-            for gen in range(NGEN):
+            for gen in range(start_gen, NGEN):
                 print(f"\n--- Generation {gen} ---")
 
                 # Parallel evaluation (only individuals modified by variation)
@@ -460,12 +520,16 @@ if __name__ == "__main__":
 
                 # Replace population
                 pop[:] = offspring
-                
-                for ind in pop:
-                    # invalidate all fitnesses
-                    ind.fitness.valid = False
+
+                # for ind in pop:
+                #     # invalidate all fitnesses
+                #     del ind.fitness.values
+
+        except KeyboardInterrupt:
+            print("\nInterrupted.")
         finally:
-            close_evaluation_pool()
+            terminate_evaluation_pool()
+            save_checkpoint(pop, hof, gen, args)
 
         print(f"Best fitness in Generation {NGEN}: {hof[0].fitness.values[0] if hof[0].fitness.valid else 'N/A'}")
         print(f"Best Ind. Height: {hof[0].height}, Size: {len(hof[0])}")

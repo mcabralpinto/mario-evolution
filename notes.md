@@ -8,6 +8,8 @@
 
 - simpler versions of past perceptions (28/3)
     - tweaked (29 - 31/3)
+    - added drop and enemy above detection (31/3)
+    - readujsted to those requested in project statement (22)
 
 # FITNESS
 
@@ -30,9 +32,6 @@
 
 - mencionar chatice do jump (é preciso tirar e voltar a por!)
 
-- increase episodes! (28/3)
-    - refactor to 3 seeds, 5 difficulties
-
 - remove break (29/3) -> made model more generalizeable 
 
 - mutation / crossover probabilities (29/3)
@@ -42,6 +41,12 @@
 - elitism (29/3)
     - removed, but later re-added
 
+- increase episodes! (28/3)
+    - refactor to 3 seeds, 5 difficulties (29/3)
+    - refactor to 5 seeds, 3 difficulties (30/3)
+    - try random 5 seeds (31/3) -> some marios get lucky! we need a better way to measure
+
+
 
 # TRY
 
@@ -50,7 +55,7 @@
 - different max tree heights
     - mutation subtree!
 
-- bloat control
+- bloat control (!!!!!!!!!!!!!)
 
 - penalize high speeds
     - make a reward that is constant every time he moves forward (don't encourage high velocity)
@@ -63,4 +68,8 @@
 
 - try w/ different episode/seed combinations
 
-- tweak / add perceptions
+- ir dando sample de novas seeds de N em N gens~
+
+- evolutionary strategies
+
+- checkpoints
