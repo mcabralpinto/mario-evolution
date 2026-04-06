@@ -17,10 +17,8 @@ COIN_WEIGHT = 10
 WIN_REWARD = 10000.0
 LOSE_PENALTY = -WIN_REWARD / 2
 N_EVAL_SEEDS = 3
-MAX_EVAL_DIFFICULTIES = 5
+MAX_EVAL_DIFFICULTIES = 3  # window size; base shifts upward over training
 TOTAL_GENERATIONS = 0
-
-curr_difficulty = 0
 
 
 port_list = [4242 + i for i in range(N_PROCESSES)]
@@ -29,51 +27,36 @@ port_list = [4242 + i for i in range(N_PROCESSES)]
 def set_total_generations(ngen):
     global TOTAL_GENERATIONS
     TOTAL_GENERATIONS = int(ngen)
-    
-# def increase_difficulty():
-#     global curr_difficulty
-#     curr_difficulty += 1
 
 
-def evaluate_agent(agent, task: Task, episodes=N_EVAL_SEEDS):
+def evaluate_agent(agent, task: Task, seed_pool=None, base_difficulty=0):
     """
-    Evaluates the agent on the task for a given number of episodes.
-    Returns the average fitness (reward).
+    Evaluates the agent on the task for each seed in seed_pool.
+    Returns the average fitness (reward) across all seeds.
+    Evaluates at difficulties [base_difficulty, base_difficulty + MAX_EVAL_DIFFICULTIES).
     """
-    #global curr_difficulty
     exp = Experiment(task, agent)
     # Speed up simulation for training
     exp.max_fps = -1
 
+    seeds = seed_pool if seed_pool is not None else list(range(1, N_EVAL_SEEDS + 1))
     total_reward = 0.0
 
-    for i in range(episodes):
+    for seed in seeds:
         seed_reward = 0.0
-        #task.env.level_seed = random.randint(1, 1000)
-        task.env.level_seed = i + 1
+        task.env.level_seed = seed
 
-        # Progress through increasing difficulty on the same seed.
-        # losses = 0
         for difficulty in range(MAX_EVAL_DIFFICULTIES):
-            task.level_difficulty = curr_difficulty + difficulty
+            task.level_difficulty = base_difficulty + difficulty
             exp.doEpisodes(1)
             seed_reward += task.cum_reward
 
             if task.status == 1:
                 seed_reward += WIN_REWARD
-            # else:
-            #     if task.status == -1:
-            #         break
-                    #seed_reward += LOSE_PENALTY
-                #     losses += 1
-                # if losses == 2:
-                #     break  # Early-stop this seed if the agent fails too much.
-                # Early-stop this seed if the agent cannot clear current difficulty.
-                # break
 
         total_reward += seed_reward
 
-    return total_reward / episodes
+    return total_reward / len(seeds)
 
 
 # --- GLOBAL VARIABLES FOR WORKER PROCESSES ---
@@ -125,11 +108,11 @@ def evaluate_individual(ind_info):
     """
     This runs for every individual in the population.
     It uses the GLOBALLY cached worker_task.
-    ind_info is a tuple of (individual, generation).
+    ind_info is a tuple of (individual, generation, seed_pool, base_difficulty).
     """
     global worker_task, worker_agent
 
-    ind, generation = ind_info
+    ind, generation, seed_pool, base_difficulty = ind_info
     worker_task.generation = generation
 
     # 1. Update the persistent agent with the new DNA
@@ -141,7 +124,7 @@ def evaluate_individual(ind_info):
     # 2. Run evaluation using the EXISTING connection
     # No "with", no "connect", just use the persistent object.
     try:
-        reward = evaluate_agent(worker_agent, worker_task)
+        reward = evaluate_agent(worker_agent, worker_task, seed_pool=seed_pool, base_difficulty=base_difficulty)
     except Exception as e:
         print(f"Error in worker: {e}")
         reward = 0
@@ -149,7 +132,7 @@ def evaluate_individual(ind_info):
     return reward
 
 
-def evaluate(agent_class, ind_info, generation=0):
+def evaluate(agent_class, ind_info, generation=0, seed_pool=None, base_difficulty=0):
     global worker_agent, worker_task
     if worker_agent is None:
         worker_agent = agent_class()
@@ -160,7 +143,7 @@ def evaluate(agent_class, ind_info, generation=0):
             is_best_eval=False,
             ngen=TOTAL_GENERATIONS,
         )
-    return evaluate_individual((ind_info, generation))
+    return evaluate_individual((ind_info, generation, seed_pool, base_difficulty))
 
 
 def _ensure_pool(agent):
@@ -196,9 +179,9 @@ def terminate_evaluation_pool():
 atexit.register(close_evaluation_pool)
 
 
-def evaluate_population(agent, population, generation=0):
-    # Pair each individual with the current generation number
-    population_with_gen = [(ind, generation) for ind in population]
+def evaluate_population(agent, population, generation=0, seed_pool=None, base_difficulty=0):
+    # Pair each individual with the current generation number, seed pool, and difficulty
+    population_with_gen = [(ind, generation, seed_pool, base_difficulty) for ind in population]
 
     if not population_with_gen:
         return np.array([])
@@ -219,7 +202,5 @@ def evaluate_population(agent, population, generation=0):
         # Pool was terminated (e.g. by the interrupt handler) — return empty
         # so the caller can check the interrupt flag and exit cleanly.
         return np.array([])
-
-    worker_task = None
 
     return np.array(rewards_list)

@@ -239,7 +239,9 @@ pset.addTerminal("can_jump", Cond, name="MayMarioJump")
 
 # Position terminals
 # position_values = [-3, -2, -1, 0, 1, 2, 3]
-position_values = [-1, 0, 1]
+# position_values = [-1, 0, 1]
+x_position_values = list(range(-1, 11))
+y_position_values = [-1, 0, 1]
 
 def int_terminal_name(prefix, value):
     if value < 0:
@@ -247,10 +249,10 @@ def int_terminal_name(prefix, value):
     return f"{prefix}_{value}"
 
 
-for x in position_values:
+for x in x_position_values:
     pset.addTerminal(x, Offset, name=int_terminal_name("X", x))
 
-for y in position_values:
+for y in y_position_values:
     pset.addTerminal(y, Offset, name=int_terminal_name("Y", y))
 
 # Comparators
@@ -326,7 +328,7 @@ def compile_individual(individual):
     return full_code_str
 
 
-def evaluate_invalid_individuals(population, generation):
+def evaluate_invalid_individuals(population, generation, seed_pool, base_difficulty):
     """Evaluate only individuals with invalid fitness and update them in-place."""
     invalid_entries = [(idx, ind) for idx, ind in enumerate(population) if not ind.fitness.valid]
     if not invalid_entries:
@@ -334,7 +336,7 @@ def evaluate_invalid_individuals(population, generation):
 
     invalid_indices = [idx for idx, _ in invalid_entries]
     compiled_invalid = [compile_individual(ind) for _, ind in invalid_entries]
-    fitnesses = evaluate_population(CodeAgent, compiled_invalid, generation=generation)
+    fitnesses = evaluate_population(CodeAgent, compiled_invalid, generation=generation, seed_pool=seed_pool, base_difficulty=base_difficulty)
 
     for idx, fit in zip(invalid_indices, fitnesses):
         fit -= len(population[idx]) * 50
@@ -375,11 +377,11 @@ def save_best_individual(best_ind, toolbox, filename_py=f"mario_best_{datetime.d
 # -----------------------------------------------------------------------------
 # 5b. CHECKPOINT HELPERS
 # -----------------------------------------------------------------------------
-def save_checkpoint(pop, hof, gen, args, filepath=None):
+def save_checkpoint(pop, hof, gen, args, seed_pool, filepath=None):
     if filepath is None:
         Path("data/checkpoints").mkdir(parents=True, exist_ok=True)
         filepath = f"data/checkpoints/checkpoint_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pkl"
-    data = {"pop": pop, "hof": hof, "gen": gen, "args": args}
+    data = {"pop": pop, "hof": hof, "gen": gen, "args": args, "seed_pool": seed_pool}
     with open(filepath, "wb") as f:
         pickle.dump(data, f)
     print(f"Checkpoint saved to '{filepath}'")
@@ -399,7 +401,7 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--gen", type=int, default=10)
     parser.add_argument("--pop", type=int, default=20)
-    parser.add_argument("--max_height", type=int, default=14)
+    parser.add_argument("--max_height", type=int, default=15)
     parser.add_argument(
         "--mode",
         choices=["evolution", "random"],
@@ -413,6 +415,12 @@ if __name__ == "__main__":
         metavar="FILE",
         help="Resume training from a checkpoint .pkl file.",
     )
+    parser.add_argument("--seed-pool-size", type=int, default=5,
+                        help="Number of level seeds per evaluation pool.")
+    parser.add_argument("--seed-rotation", type=int, default=10,
+                        help="Rotate the seed pool every N generations.")
+    parser.add_argument("--difficulty-shift", type=int, default=3,
+                        help="Max difficulty shift over training (base goes from 0 to this linearly).")
     args = parser.parse_args()
 
     random.seed(args.seed)
@@ -428,6 +436,7 @@ if __name__ == "__main__":
     toolbox.decorate("mutate", gp.staticLimit(key=operator.attrgetter("height"), max_value=args.max_height))
 
     # Population Initialization (or resume from checkpoint)
+    SEED_UNIVERSE = 1000
     start_gen = 0
     if args.checkpoint:
         print(f"Loading checkpoint from '{args.checkpoint}'...")
@@ -435,12 +444,15 @@ if __name__ == "__main__":
         pop = ckpt["pop"]
         hof = ckpt["hof"]
         start_gen = ckpt["gen"] + 1
-        print(f"Resuming from generation {start_gen}")
+        seed_pool = ckpt.get("seed_pool", random.sample(range(1, SEED_UNIVERSE + 1), args.seed_pool_size))
+        print(f"Resuming from generation {start_gen}, seed pool: {seed_pool}")
         if start_gen >= args.gen:
             print(f"Warning: checkpoint generation ({ckpt['gen']}) >= --gen ({args.gen}). No generations to run.")
     else:
         pop = toolbox.population(n=args.pop)
         hof = tools.HallOfFame(1)
+        seed_pool = random.sample(range(1, SEED_UNIVERSE + 1), args.seed_pool_size)
+        print(f"Initial seed pool: {seed_pool}")
 
     stats = tools.Statistics(lambda ind: ind.fitness.values)
     stats.register("avg", np.mean)
@@ -462,9 +474,21 @@ if __name__ == "__main__":
             for gen in range(start_gen, NGEN):
                 print(f"\n--- Generation {gen} ---")
 
+                base_difficulty = int((gen / max(NGEN - 1, 1)) * args.difficulty_shift)
+
+                if gen > start_gen and (gen - start_gen) % args.seed_rotation == 0:
+                    seed_pool = random.sample(range(1, SEED_UNIVERSE + 1), args.seed_pool_size)
+                    print(f"Rotating seed pool: {seed_pool}")
+                    for ind in pop:
+                        del ind.fitness.values
+                    for ind in hof:
+                        del ind.fitness.values
+
+                print(f"Difficulty window: [{base_difficulty}, {base_difficulty + 2}]")
+
                 # Parallel evaluation
                 compiled_pop = [compile_individual(ind) for ind in pop]
-                fitnesses = evaluate_population(CodeAgent, compiled_pop, generation=gen)
+                fitnesses = evaluate_population(CodeAgent, compiled_pop, generation=gen, seed_pool=seed_pool, base_difficulty=base_difficulty)
 
                 for ind, fit in zip(pop, fitnesses):
                     # Parsimony Pressure: Penalize large trees to fight bloat
@@ -473,16 +497,13 @@ if __name__ == "__main__":
 
                 hof.update(pop)
                 record = stats.compile(pop)
-                # if record['avg'] > 20000:
-                #     increase_difficulty()
-                #     print("Increased difficulty for next generation!")
                 print(f"\033[91mMax:\033[0m {record['max']:.3f}, \033[94mMin:\033[0m {record['min']:.3f}, \033[92mAvg:\033[0m {record['avg']:.3f}, \033[93mStd:\033[0m {record['std']:.3f}")
 
         except KeyboardInterrupt:
             print("\nInterrupted.")
         finally:
             terminate_evaluation_pool()
-            save_checkpoint(pop, hof, gen, args)
+            save_checkpoint(pop, hof, gen, args, seed_pool)
 
     else:
         print(f"Starting Evolution: {NGEN} generations, Population size {args.pop}")
@@ -492,8 +513,20 @@ if __name__ == "__main__":
             for gen in range(start_gen, NGEN):
                 print(f"\n--- Generation {gen} ---")
 
+                base_difficulty = int((gen / max(NGEN - 1, 1)) * args.difficulty_shift)
+
+                if gen > start_gen and (gen - start_gen) % args.seed_rotation == 0:
+                    seed_pool = random.sample(range(1, SEED_UNIVERSE + 1), args.seed_pool_size)
+                    print(f"Rotating seed pool: {seed_pool}")
+                    for ind in pop:
+                        del ind.fitness.values
+                    for ind in hof:
+                        del ind.fitness.values
+
+                print(f"Difficulty window: [{base_difficulty}, {base_difficulty + 2}]")
+
                 # Parallel evaluation (only individuals modified by variation)
-                evaluate_invalid_individuals(pop, generation=gen)
+                evaluate_invalid_individuals(pop, generation=gen, seed_pool=seed_pool, base_difficulty=base_difficulty)
 
                 hof.update(pop)
                 record = stats.compile(pop)
@@ -521,15 +554,11 @@ if __name__ == "__main__":
                 # Replace population
                 pop[:] = offspring
 
-                # for ind in pop:
-                #     # invalidate all fitnesses
-                #     del ind.fitness.values
-
         except KeyboardInterrupt:
             print("\nInterrupted.")
         finally:
             terminate_evaluation_pool()
-            save_checkpoint(pop, hof, gen, args)
+            save_checkpoint(pop, hof, gen, args, seed_pool)
 
         print(f"Best fitness in Generation {NGEN}: {hof[0].fitness.values[0] if hof[0].fitness.valid else 'N/A'}")
         print(f"Best Ind. Height: {hof[0].height}, Size: {len(hof[0])}")

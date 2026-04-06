@@ -24,6 +24,9 @@
 
 - penalize closeness to enemies
 
+- bloat control (1/4)
+    - slightly reduce (?)
+
 # MISC
 
 - added to observation/fit function
@@ -44,7 +47,13 @@
 - increase episodes! (28/3)
     - refactor to 3 seeds, 5 difficulties (29/3)
     - refactor to 5 seeds, 3 difficulties (30/3)
-    - try random 5 seeds (31/3) -> some marios get lucky! we need a better way to measure
+    - try random 5 seeds (31/3) -> some marios get lucky! we need a better way to measure (mention: we were making the mistake of having different seeds within the same generation - fitnesses must be comparable!)
+    - each M generations, a pool of N seeds, equal within a generation (5/4) -> good generalization (200gen/200pop)! but still only passing around 2-3 levels. we need to make the marios more consistent: make them start at low difficulty and go to high difficulty as time progresses, maybe?
+    - dynamin difficulty window (6/4)
+        - possible refinement: heavier weighting of harder levels in the window
+        - other: give more time to harder windows
+
+    - mencionar tentar a rotação de seeds com mais seeds mas isso aumentar muito o tempo de treino para gains superficiais
 
 
 
@@ -54,8 +63,6 @@
 
 - different max tree heights
     - mutation subtree!
-
-- bloat control (!!!!!!!!!!!!!)
 
 - penalize high speeds
     - make a reward that is constant every time he moves forward (don't encourage high velocity)
