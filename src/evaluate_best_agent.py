@@ -60,8 +60,6 @@ def evaluate_code_agent(suffix=""):
     print(f"Total rewards: {rewards} {f'+ {wins * 10000}' if wins > 0 else ''}")
 
 
-
-
 def evaluate_mlp_agent():
     agent = MLPAgent()
     task = MoveForwardTask(visualization=True, port=4243)

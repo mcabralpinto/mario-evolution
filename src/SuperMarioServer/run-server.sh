@@ -7,4 +7,4 @@ for port in {4242..4251}; do
     java ch.idsia.scenarios.MainRun -ag ServerAgent:$port -server on &
     sleep 1
 done
-java ch.idsia.scenarios.MainRun -ag ServerAgent:4246 -server on
+wait 

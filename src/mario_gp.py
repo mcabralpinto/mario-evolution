@@ -240,8 +240,8 @@ pset.addTerminal("can_jump", Cond, name="MayMarioJump")
 # Position terminals
 # position_values = [-3, -2, -1, 0, 1, 2, 3]
 # position_values = [-1, 0, 1]
-x_position_values = list(range(-1, 11))
-y_position_values = [-1, 0, 1]
+x_position_values = list(range(1, 4))
+y_position_values = list(range(1, 4))
 
 def int_terminal_name(prefix, value):
     if value < 0:
@@ -339,7 +339,6 @@ def evaluate_invalid_individuals(population, generation, seed_pool, base_difficu
     fitnesses = evaluate_population(CodeAgent, compiled_invalid, generation=generation, seed_pool=seed_pool, base_difficulty=base_difficulty)
 
     for idx, fit in zip(invalid_indices, fitnesses):
-        fit -= len(population[idx]) * 50
         population[idx].fitness.values = (fit,)
 
 
@@ -426,7 +425,8 @@ if __name__ == "__main__":
     random.seed(args.seed)
 
     # Genetic Operators - experiment with these values! try elitism
-    toolbox.register("select", tools.selTournament, tournsize=5)
+    toolbox.register("select", tools.selDoubleTournament,
+                 fitness_size=5, parsimony_size=1.4, fitness_first=True)
     toolbox.register("mate", gp.cxOnePoint)
     toolbox.register("expr_mut", safe_gen_grow, pset=pset, min_=2, max_=5)
     toolbox.register("mutate", gp.mutUniform, expr=toolbox.expr_mut, pset=pset)
@@ -463,7 +463,7 @@ if __name__ == "__main__":
     # Evolutionary Algorithm
     NGEN = args.gen
     set_total_generations(NGEN)
-    CXPB, MUTPB = 0.5, 0.5
+    CXPB, MUTPB = 0.6, 0.8
     ELITISM = True
 
     if args.mode == "random":
@@ -491,8 +491,6 @@ if __name__ == "__main__":
                 fitnesses = evaluate_population(CodeAgent, compiled_pop, generation=gen, seed_pool=seed_pool, base_difficulty=base_difficulty)
 
                 for ind, fit in zip(pop, fitnesses):
-                    # Parsimony Pressure: Penalize large trees to fight bloat
-                    fit -= len(ind) * 50 # Adjust this weight based on performance
                     ind.fitness.values = (fit,)
 
                 hof.update(pop)

@@ -18,29 +18,32 @@ class HunterTask(Task):
 
     
     def compute_reward(self, current_obs, last_obs):
+
         mx, my = current_obs.mario_pos
-        last_mx, last_my = last_obs.mario_pos if last_obs is not None else (mx, my)
-        delta_x = mx - last_mx
+        last_mx, last_my = last_obs.mario_pos if last_obs else (mx, my)
+
+        delta_x = int(mx > last_mx)*0.1
 
         stuck_penalty = 0.0
-        if abs(delta_x) <= 0.61 and current_obs.may_jump:
+        if delta_x == 0 and current_obs.may_jump:
             self.no_progress_steps += 1
-            stuck_penalty = self.stall_penalty_step * self.no_progress_steps
+            stuck_penalty = -10 * self.no_progress_steps
         else:
             self.no_progress_steps = 0
 
         airtime_penalty = 0.0
-        if not current_obs.on_ground: # and (self.generation >= (self.ngen / 2) or self.is_best_eval):
-            airtime_penalty = -10
+        if not current_obs.on_ground:
+            airtime_penalty = -0.5
 
         enemy_penalty = 0.0
         for ex, ey, _ in current_obs.enemies:
-            rel_x = ex - mx  # positive = ahead
-            rel_y = ey - my  # positive = below (screen coords, y increases downward)
-            # Only penalize enemies in the danger zone: 3 blocks ahead and near Mario's level
-            if -8 < rel_x <= 48 and 16 <= rel_y <= 16:
-                dist = max(1.0, (rel_x ** 2 + rel_y ** 2) ** 0.5)
-                enemy_penalty -= 10 + (100 / dist)  # more penalty for closer enemies
-            
+
+            rel_x = ex - mx
+            rel_y = ey - my
+
+            if -8 < rel_x <= 48 and -16 <= rel_y <= 16:
+
+                dist = max(1.0, (rel_x**2 + rel_y**2)**0.5)
+                enemy_penalty -= (5 / dist)
 
         return delta_x + stuck_penalty + airtime_penalty + enemy_penalty
