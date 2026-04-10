@@ -222,6 +222,8 @@ pset.addPrimitive(stmt_action_assign, [Key, Bool], Stmt, name="SET_ACTION")
 pset.addPrimitive(cond_and, [Cond, Cond], Cond, name="AND")
 pset.addPrimitive(cond_or, [Cond, Cond], Cond, name="OR")
 pset.addPrimitive(cond_not, [Cond], Cond, name="NOT")
+pset.addPrimitive(cond_check_enemy, [Offset, Offset, Comparator, EnemyKind], Cond, name="CheckEnemyAt")
+pset.addPrimitive(cond_check_landscape, [Offset, Offset, Comparator, TileValue], Cond, name="CheckLandscapeAt")
 # pset.addPrimitive(cond_check_enemy_ahead, [Comparator, EnemyKind], Cond, name="CheckEnemy")
 # pset.addPrimitive(cond_check_obstacle, [Offset, Offset, Comparator, TileValue], Cond, name="CheckObstacle")
 # pset.addPrimitive(cond_gap_ahead, [Offset], Cond, name="GapAhead")
@@ -230,18 +232,16 @@ pset.addPrimitive(cond_not, [Cond], Cond, name="NOT")
 # pset.addPrimitive(cond_hole, [], Cond, name="HoleAhead")
 # pset.addPrimitive(cond_drop, [], Cond, name="DropAhead")
 # pset.addPrimitive(cond_wall, [], Cond, name="WallAhead")
-pset.addPrimitive(cond_check_enemy, [Offset, Offset, Comparator, EnemyKind], Cond, name="CheckEnemyAt")
-pset.addPrimitive(cond_check_landscape, [Offset, Offset, Comparator, TileValue], Cond, name="CheckLandscapeAt")
 
 # Senses
 pset.addTerminal("on_ground", Cond, name="IsMarioOnGround")
 pset.addTerminal("can_jump", Cond, name="MayMarioJump")
 
 # Position terminals
+x_position_values = list(range(0, 4))
+y_position_values = list(range(0, 4))
 # position_values = [-3, -2, -1, 0, 1, 2, 3]
 # position_values = [-1, 0, 1]
-x_position_values = list(range(1, 4))
-y_position_values = list(range(1, 4))
 
 def int_terminal_name(prefix, value):
     if value < 0:
@@ -313,7 +313,7 @@ FitnessMax = cast(type[base.Fitness], creator.FitnessMax)
 Individual = cast(type[gp.PrimitiveTree], creator.Individual)
 
 toolbox: Any = base.Toolbox()
-toolbox.register("expr", safe_gen_grow, pset=pset, min_=3, max_=10)
+toolbox.register("expr", safe_gen_grow, pset=pset, min_=3, max_=15)
 toolbox.register("individual", tools.initIterate, Individual, toolbox.expr)
 toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 toolbox.register("compile", gp.compile, pset=pset)
@@ -400,7 +400,7 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--gen", type=int, default=10)
     parser.add_argument("--pop", type=int, default=20)
-    parser.add_argument("--max_height", type=int, default=15)
+    parser.add_argument("--max_height", type=int, default=10)
     parser.add_argument(
         "--mode",
         choices=["evolution", "random"],
