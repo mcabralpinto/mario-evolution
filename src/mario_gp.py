@@ -418,7 +418,7 @@ if __name__ == "__main__":
                         help="Number of level seeds per evaluation pool.")
     parser.add_argument("--seed-rotation", type=int, default=10,
                         help="Rotate the seed pool every N generations.")
-    parser.add_argument("--difficulty-shift", type=int, default=3,
+    parser.add_argument("--difficulty-shift", type=int, default=1,
                         help="Max difficulty shift over training (base goes from 0 to this linearly).")
     args = parser.parse_args()
 
@@ -476,7 +476,7 @@ if __name__ == "__main__":
 
                 base_difficulty = int((gen / max(NGEN - 1, 1)) * args.difficulty_shift)
 
-                if gen > start_gen and (gen - start_gen) % args.seed_rotation == 0:
+                if gen > 0 and gen % args.seed_rotation == 0:
                     seed_pool = random.sample(range(1, SEED_UNIVERSE + 1), args.seed_pool_size)
                     print(f"Rotating seed pool: {seed_pool}")
                     for ind in pop:
@@ -513,7 +513,7 @@ if __name__ == "__main__":
 
                 base_difficulty = int((gen / max(NGEN - 1, 1)) * args.difficulty_shift)
 
-                if gen > start_gen and (gen - start_gen) % args.seed_rotation == 0:
+                if gen > 0 and gen % args.seed_rotation == 0:
                     seed_pool = random.sample(range(1, SEED_UNIVERSE + 1), args.seed_pool_size)
                     print(f"Rotating seed pool: {seed_pool}")
                     for ind in pop:
@@ -573,4 +573,4 @@ if __name__ == "__main__":
     print(f"\nBest Fitness Found: {best_ind.fitness.values[0]}")
     save_best_individual(best_ind, toolbox, filename_py="gp_mario_best.py")
 
-# .\env\Scripts\python.exe -m src.mario_gp --pop 100 --gen 50
+# .\env\Scripts\python.exe -m src.mario_gp --pop 200 --gen 200

@@ -13,11 +13,11 @@ N_PROCESSES = 10
 # Task Definition
 TASK_TO_SOLVE = HunterTask
 
-COIN_WEIGHT = 10
+#COIN_WEIGHT = 10
 WIN_REWARD = 10000.0
 LOSE_PENALTY = -WIN_REWARD / 2
 N_EVAL_SEEDS = 3
-MAX_EVAL_DIFFICULTIES = 2  # window size; base shifts upward over training
+MAX_EVAL_DIFFICULTIES = 3  # window size; base shifts upward over training
 TOTAL_GENERATIONS = 0
 
 

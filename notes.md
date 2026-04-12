@@ -20,12 +20,14 @@
 - always jumping (28/3) 
     - discount air time - too punitive! marios don't learn to jump.
     - curriculum (good results. passes 2 levels)
-    - curriculum adjustments! (50% - 10% - 20%)
+    - curriculum adjustments! (50% -> 10% -> 20%)
+    - revert to old and try to get values right (11/4) (10 -> 50)
 
 - penalize closeness to enemies
 
 - bloat control (1/4)
-    - slightly reduce (?)
+    - reduce (7/4)
+    - change to the library version with 2 tournaments (10/4)
 
 # MISC
 

@@ -33,7 +33,7 @@ class HunterTask(Task):
 
         airtime_penalty = 0.0
         if not current_obs.on_ground:
-            airtime_penalty = -0.5
+            airtime_penalty = -50
 
         enemy_penalty = 0.0
         for ex, ey, _ in current_obs.enemies:
