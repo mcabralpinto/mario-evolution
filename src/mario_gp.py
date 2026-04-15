@@ -219,8 +219,8 @@ pset.addPrimitive(stmt_if_else, [Cond, Stmt, Stmt], Stmt, name="IF_ELSE")
 pset.addPrimitive(stmt_action_assign, [Key, Bool], Stmt, name="SET_ACTION")
 
 # Boolean logic
-pset.addPrimitive(cond_and, [Cond, Cond], Cond, name="AND")
-pset.addPrimitive(cond_or, [Cond, Cond], Cond, name="OR")
+# pset.addPrimitive(cond_and, [Cond, Cond], Cond, name="AND")
+# pset.addPrimitive(cond_or, [Cond, Cond], Cond, name="OR")
 pset.addPrimitive(cond_not, [Cond], Cond, name="NOT")
 pset.addPrimitive(cond_check_enemy, [Offset, Offset, Comparator, EnemyKind], Cond, name="CheckEnemyAt")
 pset.addPrimitive(cond_check_landscape, [Offset, Offset, Comparator, TileValue], Cond, name="CheckLandscapeAt")
@@ -313,7 +313,7 @@ FitnessMax = cast(type[base.Fitness], creator.FitnessMax)
 Individual = cast(type[gp.PrimitiveTree], creator.Individual)
 
 toolbox: Any = base.Toolbox()
-toolbox.register("expr", safe_gen_grow, pset=pset, min_=3, max_=15)
+toolbox.register("expr", safe_gen_grow, pset=pset, min_=3, max_=6)
 toolbox.register("individual", tools.initIterate, Individual, toolbox.expr)
 toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 toolbox.register("compile", gp.compile, pset=pset)
@@ -416,7 +416,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--seed-pool-size", type=int, default=5,
                         help="Number of level seeds per evaluation pool.")
-    parser.add_argument("--seed-rotation", type=int, default=10,
+    parser.add_argument("--seed-rotation", type=int, default=25,
                         help="Rotate the seed pool every N generations.")
     parser.add_argument("--difficulty-shift", type=int, default=1,
                         help="Max difficulty shift over training (base goes from 0 to this linearly).")
@@ -426,9 +426,9 @@ if __name__ == "__main__":
 
     # Genetic Operators - experiment with these values! try elitism
     toolbox.register("select", tools.selDoubleTournament,
-                 fitness_size=5, parsimony_size=1.4, fitness_first=True)
+                 fitness_size=5, parsimony_size=1.7, fitness_first=True)
     toolbox.register("mate", gp.cxOnePoint)
-    toolbox.register("expr_mut", safe_gen_grow, pset=pset, min_=2, max_=5)
+    toolbox.register("expr_mut", safe_gen_grow, pset=pset, min_=2, max_=6)
     toolbox.register("mutate", gp.mutUniform, expr=toolbox.expr_mut, pset=pset)
 
     # Decorators to limit tree height

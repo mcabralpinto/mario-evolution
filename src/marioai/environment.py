@@ -75,7 +75,6 @@ class Environment(object):
 
         elif len(data) > 5:
             return extractObservation(data)
-
         else:
             logging.warning('[ENVIRONMENT] Unexpected received data: %s'%data);
 
