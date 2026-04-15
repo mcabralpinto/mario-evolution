@@ -1,3 +1,5 @@
+from numpy import rint
+
 from src.marioai.task import Task
 
 class HunterTask(Task):
@@ -21,11 +23,9 @@ class HunterTask(Task):
 
         mx, my = current_obs.mario_pos
         last_mx, last_my = last_obs.mario_pos if last_obs else (mx, my)
-
         delta_x = int(mx > last_mx)
         if abs(mx- last_mx) < 0.61:
             delta_x = 0
-        # print(f"delta_x: {delta_x}, mx: {mx}, last_mx: {last_mx}")
         stuck_penalty = 0.0
         if delta_x == 0 and current_obs.on_ground :
             self.no_progress_steps += 1
@@ -38,8 +38,8 @@ class HunterTask(Task):
         airtime_penalty = 0.0
         if not current_obs.on_ground:
             # mario going up
-            if my > last_my:
-                airtime_penalty -= int(my > last_my) * 10
+            if my < last_my:
+                airtime_penalty -= int(my > last_my) * 40
 
 
         return delta_x + stuck_penalty + airtime_penalty 
