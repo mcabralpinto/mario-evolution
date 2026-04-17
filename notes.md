@@ -80,3 +80,5 @@
     - piranhas: make mario stop when they are above a tube (or above him?) then move once they aren't 
 
 - rethink win reward (decrease? add conditions?)
+
+- add any/all/for to grammar?

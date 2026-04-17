@@ -20,24 +20,27 @@ class HunterTask(Task):
 
     
     def compute_reward(self, current_obs, last_obs):
-
         mx, my = current_obs.mario_pos
         last_mx, last_my = last_obs.mario_pos if last_obs else (mx, my)
-        delta_x = int(mx > last_mx)
-        if abs(mx - last_mx) < 0.61:
-            delta_x = 0
+
+        # MOVING REWARD
+        delta_x = int(mx - last_mx >= 0.61)
+
+        # STUCK PENALTY - maybe overhaul to only include cases where he is clearly stuck on a wall
         stuck_penalty = 0.0
         if delta_x == 0 or last_mx > mx:
             self.no_progress_steps += 1
         else:
             self.no_progress_steps = 0
-
         if self.no_progress_steps > 10:
             stuck_penalty = -10 * (self.no_progress_steps - 10)
 
+        # AIR TIME PENALTY
         airtime_penalty = 0.0
         if not current_obs.on_ground:
             # mario going up
             airtime_penalty -= int(my > last_my) 
+
+        # ENEMY PENALTY
 
         return delta_x + stuck_penalty + airtime_penalty 
