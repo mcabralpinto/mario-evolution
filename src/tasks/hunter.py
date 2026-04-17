@@ -24,10 +24,10 @@ class HunterTask(Task):
         mx, my = current_obs.mario_pos
         last_mx, last_my = last_obs.mario_pos if last_obs else (mx, my)
         delta_x = int(mx > last_mx)
-        if abs(mx- last_mx) < 0.61:
+        if abs(mx - last_mx) < 0.61:
             delta_x = 0
         stuck_penalty = 0.0
-        if delta_x == 0 and current_obs.on_ground :
+        if delta_x == 0 or last_mx > mx:
             self.no_progress_steps += 1
         else:
             self.no_progress_steps = 0
@@ -38,8 +38,9 @@ class HunterTask(Task):
         airtime_penalty = 0.0
         if not current_obs.on_ground:
             # mario going up
-            if my < last_my:
-                airtime_penalty -= int(my > last_my) * 40
+            airtime_penalty -= int(my > last_my) 
+
+        # print("delta_x", delta_x, "stuck_penalty", stuck_penalty, "airtime_penalty", airtime_penalty)
 
 
         return delta_x + stuck_penalty + airtime_penalty 
