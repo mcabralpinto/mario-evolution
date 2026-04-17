@@ -9,7 +9,8 @@
 - simpler versions of past perceptions (28/3)
     - tweaked (29 - 31/3)
     - added drop and enemy above detection (31/3)
-    - readujsted to those requested in project statement (22)
+    - readujsted to those requested in project statement 
+    - some stuff like position values tampered with
 
 # FITNESS
 
@@ -51,13 +52,14 @@
     - refactor to 5 seeds, 3 difficulties (30/3)
     - try random 5 seeds (31/3) -> some marios get lucky! we need a better way to measure (mention: we were making the mistake of having different seeds within the same generation - fitnesses must be comparable!)
     - each M generations, a pool of N seeds, equal within a generation (5/4) -> good generalization (200gen/200pop)! but still only passing around 2-3 levels. we need to make the marios more consistent: make them start at low difficulty and go to high difficulty as time progresses, maybe?
-    - dynamin difficulty window (6/4)
+    - dynamic difficulty window (6/4)
         - possible refinement: heavier weighting of harder levels in the window
         - other: give more time to harder windows
+    - teacher said we only need 3 difs we're now not using dynamic and training on the 3 diffs (later).
 
     - mencionar tentar a rotação de seeds com mais seeds mas isso aumentar muito o tempo de treino para gains superficiais
 
-
+    - checkpoints
 
 # TRY
 
@@ -69,16 +71,12 @@
 - penalize high speeds
     - make a reward that is constant every time he moves forward (don't encourage high velocity)
 
-- try more episodes / difficulties (high seed amount w/ break)
-
 - apply random waits at the start to make enemy timing less predictable, thus forcing better generalization
-
-- more forgiving (? esqueci-me do que isto era)
-
-- try w/ different episode/seed combinations
-
-- ir dando sample de novas seeds de N em N gens~
 
 - evolutionary strategies
 
-- checkpoints
+- handle enemies directly
+    - goombas: penalize direct contact
+    - piranhas: make mario stop when they are above a tube (or above him?) then move once they aren't 
+
+- rethink win reward (decrease? add conditions?)
