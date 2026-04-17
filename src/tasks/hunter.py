@@ -33,14 +33,11 @@ class HunterTask(Task):
             self.no_progress_steps = 0
 
         if self.no_progress_steps > 10:
-            stuck_penalty = -10 * self.no_progress_steps
+            stuck_penalty = -10 * (self.no_progress_steps - 10)
 
         airtime_penalty = 0.0
         if not current_obs.on_ground:
             # mario going up
             airtime_penalty -= int(my > last_my) 
-
-        # print("delta_x", delta_x, "stuck_penalty", stuck_penalty, "airtime_penalty", airtime_penalty)
-
 
         return delta_x + stuck_penalty + airtime_penalty 
