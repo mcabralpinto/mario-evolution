@@ -219,8 +219,8 @@ pset.addPrimitive(stmt_if_else, [Cond, Stmt, Stmt], Stmt, name="IF_ELSE")
 pset.addPrimitive(stmt_action_assign, [Key, Bool], Stmt, name="SET_ACTION")
 
 # Boolean logic
-# pset.addPrimitive(cond_and, [Cond, Cond], Cond, name="AND")
-# pset.addPrimitive(cond_or, [Cond, Cond], Cond, name="OR")
+pset.addPrimitive(cond_and, [Cond, Cond], Cond, name="AND")
+pset.addPrimitive(cond_or, [Cond, Cond], Cond, name="OR")
 pset.addPrimitive(cond_not, [Cond], Cond, name="NOT")
 pset.addPrimitive(cond_check_enemy, [Offset, Offset, Comparator, EnemyKind], Cond, name="CheckEnemyAt")
 pset.addPrimitive(cond_check_landscape, [Offset, Offset, Comparator, TileValue], Cond, name="CheckLandscapeAt")
