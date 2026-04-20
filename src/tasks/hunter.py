@@ -25,7 +25,6 @@ class HunterTask(Task):
 
         # MOVING REWARD
         delta_x = int(mx - last_mx >= 0.61)
-
         # STUCK PENALTY - maybe overhaul to only include cases where he is clearly stuck on a wall
         stuck_penalty = 0.0
         if delta_x == 0 or last_mx > mx:
@@ -41,6 +40,5 @@ class HunterTask(Task):
             # mario going up
             airtime_penalty -= int(my > last_my) 
 
-        # ENEMY PENALTY
 
         return delta_x + stuck_penalty + airtime_penalty 
