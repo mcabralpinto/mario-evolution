@@ -24,11 +24,14 @@
     - curriculum adjustments! (50% -> 10% -> 20%)
     - revert to old and try to get values right (11/4) (10 -> 50)
 
-- penalize closeness to enemies
+- penalize closeness to enemies (later removed, i don't remember why)
 
 - bloat control (1/4)
     - reduce (7/4)
     - change to the library version with 2 tournaments (10/4)
+
+- overhaul stuck penalty - now only when truly stuck and not waiting (19/4)
+- simple enemy penalty - similar to what we had before (19/4)
 
 # MISC
 
@@ -56,10 +59,14 @@
         - possible refinement: heavier weighting of harder levels in the window
         - other: give more time to harder windows
     - teacher said we only need 3 difs we're now not using dynamic and training on the 3 diffs (later).
-
     - mencionar tentar a rotação de seeds com mais seeds mas isso aumentar muito o tempo de treino para gains superficiais
+    - now doing 300gen/200pop (18/4)
 
-    - checkpoints
+- checkpoints
+
+# OTHER
+
+    - melhorámos o script de teste original (duas opções)
 
 # TRY
 

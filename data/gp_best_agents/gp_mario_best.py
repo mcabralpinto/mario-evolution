@@ -1,27 +1,18 @@
 
 # Evolved Mario Controller
-# Fitness: 23994.40866699219
+# Fitness: 20216.909399414064
 
 
 def corre(action, landscape, enemies, can_jump, on_ground, mario_pos, Mario, Sprite, **kwargs):
 
-    if (enemies[11+2][11+2] >= 3):
-        action[Mario.KEY_RIGHT] = 0
+    if (not on_ground):
+        action[Mario.KEY_JUMP] = 1
     else:
-        if on_ground:
-            if (not (enemies[11+1][11+3] >= 3)):
-                if on_ground:
-                    if can_jump:
-                        action[Mario.KEY_JUMP] = 1
-                else:
-                    action[Mario.KEY_LEFT] = 1
-            else:
-                action[Mario.KEY_JUMP] = 1
-        else:
+        if can_jump:
             action[Mario.KEY_JUMP] = 1
-    if (landscape[11+2][11+0] != 16):
-        action[Mario.KEY_RIGHT] = 1
+    if (((enemies[11+2][11+3] <= 6) and (enemies[11+3][11+1] <= 6)) or (on_ground and (landscape[11+3][11+0] != 16))):
+        if (not on_ground):
+            action[Mario.KEY_RIGHT] = 1
     else:
-        action[Mario.KEY_RIGHT] = 0
-    action[Mario.KEY_SPEED] = 1
+        action[Mario.KEY_DOWN] = 0
 

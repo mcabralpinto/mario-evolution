@@ -283,7 +283,7 @@ for value, name in enemy_types.items():
 
 # Obstacle values
 obstacle_values = {
-    -11: "SOFT_OBSTACLE",
+    #-11: "SOFT_OBSTACLE",
     -10: "HARD_OBSTACLE",
     16: "BRICK",
     20: "ENEMY_OBSTACLE",
