@@ -239,9 +239,8 @@ pset.addTerminal("can_jump", Cond, name="MayMarioJump")
 
 # Position terminals
 x_position_values = list(range(0, 4))
-y_position_values = list(range(0, 4))
-# position_values = [-3, -2, -1, 0, 1, 2, 3]
-# position_values = [-1, 0, 1]
+y_position_values = list(range(-3, 4))
+
 
 def int_terminal_name(prefix, value):
     if value < 0:

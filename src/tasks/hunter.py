@@ -46,14 +46,14 @@ class HunterTask(Task):
         ): 
             # if mario is stuck for 10 steps and there is an obstacle in front of him, penalize
             stuck_penalty = -10 * (self.no_progress_steps - 10)
+            # print(f"PENALTY FOR STALLING: {stuck_penalty} (no progress for {self.no_progress_steps} steps)")
 
 
         # AIR TIME PENALTY
         airtime_penalty = 0.0
         if not current_obs.on_ground:
             # mario going up
-            airtime_penalty -= int(my > last_my) 
-
+            airtime_penalty -= int(my < last_my) * 200
 
         # ENEMY PENALTY
         enemy_penalty = 0.0
@@ -62,13 +62,13 @@ class HunterTask(Task):
             enemy_penalty = -10
         
         # piranha wait reward - if there is a piranha above, reward waiting (not moving forward)
-        # if self.beta and any(current_obs.level_scene[i][j] == 12 for i in range(0, 12) for j in range(12, 14)):
-        #     pass
-                    
+        if any(current_obs.level_scene[x][y] == 12 for x in range(8, 11) for y in range(12, 15)):
+            # penalize moving forward if there is a piranha above
+            delta_x -= int(delta_x > 0) * 10000
+            
         
         # DEBUG PRINT
-        if (self.steps % 5 == 0 and self.debug):          
-            #print(current_obs.level_scene)
+        if (self.steps % 5 == 0 and self.debug):     
             for row in current_obs.level_scene:
                 print(" ".join(f"{int(cell):>3}" for cell in row))
             print()
