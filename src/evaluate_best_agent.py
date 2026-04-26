@@ -36,6 +36,47 @@ def load_gp_best_module(suffix=""):
     raise FileNotFoundError(f"No {filename} found in data/gp_best_agents")
 
 
+def evaluate_from_code(code_str, seed_start=SEED_START, seed_n=SEED_N,
+                       display_difficulties=DISPLAY_DIFFICULTIES):
+    """Evaluate a raw code string. Returns (overall_win_rate, {diff: win_rate})."""
+    agent = CodeAgent()
+    agent.action_function = code_str
+
+    task = HunterTask(
+        visualization=False,
+        port=4243,
+        init_mario_mode=0,
+        level_difficulty=0,
+        is_best_eval=True,
+    )
+    exp = marioai.Experiment(task, agent)
+    task.env.level_type = 0
+
+    seeds = range(seed_start, seed_start + seed_n)
+    difficulties = range(display_difficulties)
+    episodes = [(s, d) for s in seeds for d in difficulties]
+
+    total_wins = 0
+    n_episodes = 0
+    wins_per_diff = {d: 0 for d in difficulties}
+    counts_per_diff = {d: 0 for d in difficulties}
+    for seed, diff in tqdm(episodes, desc="Evaluating", unit="ep"):
+        task.env.level_seed = seed
+        task.level_difficulty = diff
+        exp.max_fps = 0
+        exp.doEpisodes()
+        if task.status == 1:
+            total_wins += 1
+            wins_per_diff[diff] += 1
+        counts_per_diff[diff] += 1
+        n_episodes += 1
+
+    overall = total_wins / n_episodes if n_episodes else 0
+    per_diff = {d: wins_per_diff[d] / counts_per_diff[d] if counts_per_diff[d] else 0
+                for d in difficulties}
+    return overall, per_diff
+
+
 def evaluate_code_agent(suffix="", display=False, seed_start=SEED_START, seed_n=SEED_N,
                         display_seed_n=DISPLAY_SEED_N, display_difficulties=DISPLAY_DIFFICULTIES):
     mario_best = load_gp_best_module(suffix)
@@ -112,7 +153,7 @@ def evaluate_mlp_agent():
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("suffix", nargs="?", default="", help="Suffix for gp_mario_best_<suffix>.py")
+    parser.add_argument("--suffix", type=str, default="", help="Suffix for gp_mario_best_<suffix>.py")
     parser.add_argument("--display", action="store_true", help="Visualize across a small set of seeds/difficulties")
     parser.add_argument("--seed-start", type=int, default=SEED_START)
     parser.add_argument("--seed-n", type=int, default=SEED_N, help="Seeds to evaluate in silent mode")

@@ -10,7 +10,7 @@
     - tweaked (29 - 31/3)
     - added drop and enemy above detection (31/3)
     - readujsted to those requested in project statement 
-    - some stuff like position values tampered with
+    - some stuff like position values tampered with (explain better in the report!)
 
 # FITNESS
 
@@ -23,6 +23,7 @@
     - curriculum (good results. passes 2 levels)
     - curriculum adjustments! (50% -> 10% -> 20%)
     - revert to old and try to get values right (11/4) (10 -> 50)
+    - different values (1 -> 10 -> 25 -> 70 -> 150 -> 50) (we can kind of conclude that this alone isn't going to help. we need to either find a better way of enforcing our wished behavior or simply accept running and jumping with minor optimizations as the best solution)
 
 - penalize closeness to enemies (later removed, i don't remember why)
 
@@ -61,6 +62,11 @@
     - teacher said we only need 3 difs we're now not using dynamic and training on the 3 diffs (later).
     - mencionar tentar a rotação de seeds com mais seeds mas isso aumentar muito o tempo de treino para gains superficiais
     - now doing 300gen/200pop (18/4)
+    - seed rotation (original: every 10 seeds) (22/04)
+        - every 5 seeds: worse results! (see why)
+        - every 20 seeds: worse results! (see why)
+        - every 10 seeds: bad result! leads to next point
+    - get checkpoint at each seed new seed insertion; evaluate best at end (26/04)
 
 - checkpoints
 
@@ -89,3 +95,5 @@
 - rethink win reward (decrease? add conditions?)
 
 - add any/all/for to grammar?
+
+- increase jump pen

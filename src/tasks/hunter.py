@@ -51,9 +51,9 @@ class HunterTask(Task):
 
         # AIR TIME PENALTY
         airtime_penalty = 0.0
-        if not current_obs.on_ground:
-            # mario going up
-            airtime_penalty -= int(my < last_my) * 200
+        # if not current_obs.on_ground:
+        #     # mario going up
+        #     airtime_penalty -= int(my < last_my) * 200
 
         # ENEMY PENALTY
         enemy_penalty = 0.0
@@ -61,10 +61,10 @@ class HunterTask(Task):
             # if there is an enemy in the 3x2 area in front of mario, penalize
             enemy_penalty = -10
         
-        # piranha wait reward - if there is a piranha above, reward waiting (not moving forward)
-        if any(current_obs.level_scene[x][y] == 12 for x in range(8, 11) for y in range(12, 15)):
-            # penalize moving forward if there is a piranha above
-            delta_x -= int(delta_x > 0) * 10000
+        # # piranha wait reward - if there is a piranha above, reward waiting (not moving forward)
+        # if any(current_obs.level_scene[x][y] == 12 for x in range(8, 11) for y in range(12, 15)):
+        #     # penalize moving forward if there is a piranha above
+        #     delta_x -= int(delta_x > 0) * 10000
             
         
         # DEBUG PRINT

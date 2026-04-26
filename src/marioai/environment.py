@@ -99,7 +99,7 @@ class Environment(object):
           action (list): a list of integers.
         '''
         
-        actionStr = "".join(str(i) for i in action)
+        actionStr = "".join(str(int(i)) for i in action)
         actionStr += "\r\n"
         self._tcpclient.sendData(actionStr)
     

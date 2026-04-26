@@ -240,7 +240,8 @@ pset.addTerminal("can_jump", Cond, name="MayMarioJump")
 # Position terminals
 x_position_values = list(range(0, 4))
 y_position_values = list(range(-3, 4))
-
+# position_values = [-3, -2, -1, 0, 1, 2, 3]
+# position_values = [-1, 0, 1]
 
 def int_terminal_name(prefix, value):
     if value < 0:
@@ -415,10 +416,13 @@ if __name__ == "__main__":
     )
     parser.add_argument("--seed-pool-size", type=int, default=5,
                         help="Number of level seeds per evaluation pool.")
-    parser.add_argument("--seed-rotation", type=int, default=25,
+    parser.add_argument("--seed-rotation", type=int, default=10,
                         help="Rotate the seed pool every N generations.")
     parser.add_argument("--difficulty-shift", type=int, default=1,
                         help="Max difficulty shift over training (base goes from 0 to this linearly).")
+    parser.add_argument("--static-operators", action="store_true",
+                        help="Keep mutation rate and tournament size fixed (MUTPB=0.8, fitness_size=5). "
+                             "Default: dynamic schedule (explore early, exploit late).")
     args = parser.parse_args()
 
     random.seed(args.seed)
@@ -462,8 +466,15 @@ if __name__ == "__main__":
     # Evolutionary Algorithm
     NGEN = args.gen
     set_total_generations(NGEN)
-    CXPB, MUTPB = 0.6, 0.8
+    CXPB = 0.6
     ELITISM = True
+
+    # Static fallback values (used when --static-operators is set)
+    STATIC_MUTPB = 0.8
+    STATIC_TOURN_SIZE = 5
+    # Dynamic schedule bounds
+    MUTPB_START, MUTPB_END = 1.0, 0.4
+    TOURN_START, TOURN_END = 2, 7
 
     if args.mode == "random":
         print(f"Starting Random Search: {NGEN} generations, Population size {args.pop}")
@@ -474,6 +485,7 @@ if __name__ == "__main__":
                 print(f"\n--- Generation {gen} ---")
 
                 base_difficulty = int((gen / max(NGEN - 1, 1)) * args.difficulty_shift)
+                # print(f"Difficulty window: [{base_difficulty}, {base_difficulty + 2}]")
 
                 if gen > 0 and gen % args.seed_rotation == 0:
                     seed_pool = random.sample(range(1, SEED_UNIVERSE + 1), args.seed_pool_size)
@@ -482,8 +494,9 @@ if __name__ == "__main__":
                         del ind.fitness.values
                     for ind in hof:
                         del ind.fitness.values
-
-                print(f"Difficulty window: [{base_difficulty}, {base_difficulty + 2}]")
+                    Path("data/seed_checkpoints").mkdir(parents=True, exist_ok=True)
+                    save_checkpoint(pop, hof, gen, args, seed_pool,
+                                    filepath=f"data/seed_checkpoints/checkpoint_gen_{gen}.pkl")
 
                 # Parallel evaluation
                 compiled_pop = [compile_individual(ind) for ind in pop]
@@ -511,6 +524,7 @@ if __name__ == "__main__":
                 print(f"\n--- Generation {gen} ---")
 
                 base_difficulty = int((gen / max(NGEN - 1, 1)) * args.difficulty_shift)
+                # print(f"Difficulty window: [{base_difficulty}, {base_difficulty + 2}]")
 
                 if gen > 0 and gen % args.seed_rotation == 0:
                     seed_pool = random.sample(range(1, SEED_UNIVERSE + 1), args.seed_pool_size)
@@ -519,8 +533,21 @@ if __name__ == "__main__":
                         del ind.fitness.values
                     for ind in hof:
                         del ind.fitness.values
+                    Path("data/seed_checkpoints").mkdir(parents=True, exist_ok=True)
+                    save_checkpoint(pop, hof, gen, args, seed_pool,
+                                    filepath=f"data/seed_checkpoints/checkpoint_gen_{gen}.pkl")
 
-                print(f"Difficulty window: [{base_difficulty}, {base_difficulty + 2}]")
+                # Dynamic operator schedule (explore early, exploit late)
+                t = gen / max(NGEN - 1, 1)
+                if args.static_operators:
+                    MUTPB = STATIC_MUTPB
+                    tourn_size = STATIC_TOURN_SIZE
+                else:
+                    MUTPB = MUTPB_START + (MUTPB_END - MUTPB_START) * t
+                    tourn_size = round(TOURN_START + (TOURN_END - TOURN_START) * t)
+                    toolbox.register("select", tools.selDoubleTournament,
+                                     fitness_size=tourn_size, parsimony_size=1.7, fitness_first=True)
+                print(f"Operators: MUTPB={MUTPB:.2f}, tournament_size={tourn_size}")
 
                 # Parallel evaluation (only individuals modified by variation)
                 evaluate_invalid_individuals(pop, generation=gen, seed_pool=seed_pool, base_difficulty=base_difficulty)
@@ -572,4 +599,4 @@ if __name__ == "__main__":
     print(f"\nBest Fitness Found: {best_ind.fitness.values[0]}")
     save_best_individual(best_ind, toolbox, filename_py="gp_mario_best.py")
 
-# .\env\Scripts\python.exe -m src.mario_gp --pop 200 --gen 200
+# .\env\Scripts\python.exe -m src.mario_gp --pop 200 --gen 300
