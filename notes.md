@@ -97,3 +97,32 @@
 - add any/all/for to grammar?
 
 - increase jump pen
+
+# old detection (simple heuristic)
+
+    def enemies_in_radius(self, obs, radius):
+        e = []
+        for enemie in obs.enemies:
+            if enemie[0] != 2:
+                continue
+            if abs(enemie[1] - obs.mario_pos[0]) <= radius:
+                print(abs(enemie[1] - obs.mario_pos[0]))
+                e.append(enemie)
+        return e
+
+        if last_obs:
+            print("last danger zone")
+            last_danger_zone = self.enemies_in_radius(last_obs, small_x_radius)
+            print("current danger zone")
+            danger_zone = self.enemies_in_radius(current_obs, small_x_radius)
+            print("current big radius enemies")
+            big_radius_enemies = self.enemies_in_radius(current_obs, big_x_radius) 
+            print("last big radius enemies")
+            last_big_radius_enemies = self.enemies_in_radius(last_obs, big_x_radius) 
+            # count kills
+            if len(danger_zone) < len(last_danger_zone) and len(big_radius_enemies) < len(last_big_radius_enemies):
+                # if there are fewer enemies in the small radius and also fewer in the big radius, count as kill
+                self.kills += 1
+                kill_reward = 10000
+                # print(f"KILLED ENEMY! Total kills: {self.kills}, reward: {kill_reward}")
+
