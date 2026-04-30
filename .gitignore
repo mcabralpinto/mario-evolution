@@ -1,5 +1,23 @@
+legacy_src
+docs/context
+docs/previous_report.tex
+
 env
 mario_venv
+
 __pycache__
+
 .claude
-data
+.claudeignore
+
+data/checkpoints
+data/seed_checkpoints
+
+# latex auxiliary files
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.synctex.gz

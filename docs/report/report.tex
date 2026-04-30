@@ -1,150 +1,407 @@
-% This is samplepaper.tex, a sample chapter demonstrating the
-% LLNCS macro package for Springer Computer Science proceedings;
-% Version 2.20 of 2017/10/04
-%
 \documentclass[runningheads]{llncs}
-%
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
 \usepackage{graphicx}
-% Used for displaying a sample figure. If possible, figure files should
-% be included in EPS format.
-%
-% If you use the hyperref package, please uncomment the following line
-% to display URLs in blue roman font according to Springer's eBook style:
-% \renewcommand\UrlFont{\color{blue}\rmfamily}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{parskip}
+
+\newcommand{\TODO}[1]{\textcolor{red}{\textbf{[TODO: #1]}}}
 
 \begin{document}
-%
-\title{Contribution Title\thanks{Supported by organization x.}}
-%
-%\titlerunning{Abbreviated paper title}
-% If the paper title is too long for the running head, you can set
-% an abbreviated paper title here
-%
-\author{First Author\inst{1}\orcidID{0000-1111-2222-3333} \and
-Second Author\inst{2,3}\orcidID{1111-2222-3333-4444} \and
-Third Author\inst{3}\orcidID{2222--3333-4444-5555}}
-%
-\authorrunning{F. Author et al.}
-% First names are abbreviated in the running head.
-% If there are more than two authors, 'et al.' is used.
-%
-\institute{Princeton University, Princeton NJ 08544, USA \and
-Springer Heidelberg, Tiergartenstr. 17, 69121 Heidelberg, Germany
-\email{lncs@springer.com}\\
-\url{http://www.springer.com/gp/computer-science/lncs} \and
-ABC Institute, Rupert-Karls-University Heidelberg, Heidelberg, Germany\\
-\email{\{abc,lncs\}@uni-heidelberg.de}}
-%
-\maketitle              % typeset the header of the contribution
-%
+
+\title{Evolving Super Mario Bros Controllers\\via Typed Genetic Programming}
+\titlerunning{Evolving Mario Controllers via Typed GP}
+
+% TODO: confirm group members
+\author{Miguel Cabral Pinto \and Tiago Silva}
+\authorrunning{M. Cabral Pinto and T. Silva}
+\institute{Departamento de Engenharia Informática, Universidade de Coimbra\\
+\email{\{mcp, tds\}@student.uc.pt}}
+
+\maketitle
+
 \begin{abstract}
-The abstract should briefly summarize the contents of the paper in
-15--250 words.
-
-\keywords{First keyword  \and Second keyword \and Another keyword.}
+We evolve game controllers for Super Mario Bros using Genetic Programming, pursuing two successive objectives: completing levels and maximizing enemy kills and coins obtained. Each individual is a typed syntax tree that compiles to an executable Python function, so the search operates over the space of structured programs. We define a typed grammar giving agents access to a $22\times22$ grid of terrain and enemy data, and train through two goal stages: level completion and kill/coin maximization. Bloat is controlled through Double Tournament selection with parsimony pressure; generalization is promoted through a rotating seed pool that changes every 10 generations. \TODO{2 sentences: win rate achieved by the evolved agent, improvement over the random baseline.}
 \end{abstract}
-%
-%
-%
-\section{First Section}
-\subsection{A Subsection Sample}
-Please note that the first paragraph of a section or subsection is
-not indented. The first paragraph that follows a table, figure,
-equation etc. does not need an indent, either.
 
-Subsequent paragraphs, however, are indented.
 
-\subsubsection{Sample Heading (Third Level)} Only two levels of
-headings should be numbered. Lower level headings remain unnumbered;
-they are formatted as run-in headings.
+% =============================================================================
+\section{Introduction}
+% =============================================================================
 
-\paragraph{Sample Heading (Fourth Level)}
-The contribution should contain no more than four levels of
-headings. Table~\ref{tab1} gives a summary of all heading levels.
+% Platform games are a natural testbed for game AI: the state space is high-dimensional, level geometry varies across seeds, and success requires coordinating simple actions (jumping, running, stopping) into extended behavioral sequences, which rules out approaches that rely on differentiable objectives or explicit model access. The Mario AI framework~\cite{togelius2009mario} provides a reproducible instance of this setting, with a configurable difficulty axis and a socket-based API that allows external agents to control Mario at each simulation step.
 
-\begin{table}
-\caption{Table captions should be placed above the
-tables.}\label{tab1}
-\begin{tabular}{|l|l|l|}
-\hline
-Heading level &  Example & Font size and style\\
-\hline
-Title (centered) &  {\Large\bfseries Lecture Notes} & 14 point, bold\\
-1st-level heading &  {\large\bfseries 1 Introduction} & 12 point, bold\\
-2nd-level heading & {\bfseries 2.1 Printing Area} & 10 point, bold\\
-3rd-level heading & {\bfseries Run-in Heading in Bold.} Text follows & 10 point, bold\\
-4th-level heading & {\itshape Lowest Level Heading.} Text follows & 10 point, italic\\
-\hline
+In this work we use Genetic Programming (GP)~\cite{koza1992genetic} to evolve controllers for the Mario AI framework~\cite{togelius2009mario}. GP is well-matched to this problem for two reasons: it requires only a scalar fitness signal and no gradient information, and it produces programs as output, meaning the evolved controller is a readable Python function. Since the failure mode of any agent is visible in the code, iterating on the fitness function is fast and targeted.
+
+The course provided a base GP repository implemented with DEAP~\cite{fortin2012deap}: a minimal random search over a small typed grammar with two senses (\texttt{on\_ground}, \texttt{can\_jump}), two actions (\texttt{RIGHT}, \texttt{JUMP}), and basic \texttt{IF}/\texttt{SEQ} program structure. During our work, we expanded the grammar to give agents better perception of terrain and enemies, designed the fitness function, and replaced the random search with a full evolutionary algorithm.
+
+Training follows two stages: a completion stage, where the goal is to reach the end of the level, and a hunter stage, where additional rewards are awarded for killing enemies. The fitness function went through several iterations; the choices behind the final version are described in Section~\ref{sec:fitness}.
+
+
+% % =============================================================================
+% \section{Background}
+% \label{sec:background}
+% % =============================================================================
+
+% Evolutionary Algorithms (EAs)~\cite{back1996evolutionary} search by maintaining a population of candidate solutions and iteratively improving it through selection and variation. Selection identifies fitter individuals as parents; crossover recombines their genetic material to produce offspring; mutation introduces random perturbations to maintain diversity. Since EAs require only a scalar fitness score and impose no smoothness assumptions on the objective, they are a natural fit for black-box simulators such as the Mario framework, where no gradient of the fitness function is available.
+
+% Genetic Programming~\cite{koza1992genetic} applies this scheme to programs. Individuals are syntax trees in which internal nodes are functions drawn from a \emph{function set} and leaves are constants or input variables from a \emph{terminal set}. The key practical challenge is \emph{bloat}: programs tend to grow in size over generations without corresponding fitness improvement, since non-contributing code segments are protected from disruption by genetic operators and gradually accumulate~\cite{luke2006bloat}. Unchecked bloat slows evaluation, reduces interpretability, and eventually saturates memory. We address it through the selection scheme described in Section~\ref{sec:ea}.
+
+% Typed GP~\cite{montana1995strongly} attaches explicit input and return types to each primitive, so the grammar defines typed production rules and every tree the system can generate is type-consistent by construction. In the context of evolving executable code, this means every individual compiles without error, which eliminates a common source of wasted evaluations in untyped GP formulations.
+
+
+% =============================================================================
+\section{Methodology}
+\label{sec:method}
+% =============================================================================
+
+\subsection{Environment}
+\label{sec:env}
+
+The Mario AI framework~\cite{togelius2009mario} is a Java simulator that exposes a socket API through which external agents send action vectors and receive observations at a fixed step rate. At each step the agent receives information about the simulation (e.g., Mario state \& position, level scene observation grid).
+
+The agent outputs a boolean vector $[\texttt{LEFT},\,\texttt{RIGHT},\,\texttt{DOWN},\,\texttt{JUMP},\,\texttt{SPEED}]$ at each step, controlling Mario's actions. Difficulty is controlled along two independent axes: mario mode (small, large, or fire) and level difficulty, which scales obstacle density and enemy variety.
+
+\subsection{Typed Grammar and Representation}
+\label{sec:grammar}
+
+Each individual is a program tree in a typed grammar built on top of the provided DEAP~\cite{fortin2012deap} scaffold. We extended the original four types (\texttt{Cond}, \texttt{Key}, \texttt{Bool}, \texttt{Expr}) to nine: \texttt{Program}, \texttt{Stmt}, \texttt{Cond}, \texttt{Comparator}, \texttt{Key}, \texttt{Bool}, \texttt{Offset}, \texttt{EnemyKind}, and \texttt{TileValue}.
+
+\paragraph{Program structure.}
+A \texttt{Program} is a non-empty sequence of statements built left-recursively:
+\[
+\text{Program} \to \texttt{END}(\text{Stmt}) \mid \texttt{SEQ}(\text{Stmt},\,\text{Program})
+\]
+
+\paragraph{Statements.}
+A \texttt{Stmt} is a conditional branch or a direct key assignment:
+\[
+\text{Stmt} \to \texttt{IF}(\text{Cond},\,\text{Stmt}) \mid \texttt{IF\_ELSE}(\text{Cond},\,\text{Stmt},\,\text{Stmt}) \mid \texttt{SET\_ACTION}(\text{Key},\,\text{Bool})
+\]
+
+\paragraph{Conditions.}
+Conditions combine two perception predicates with standard boolean connectives:
+\begin{align*}
+\text{Cond} \to{}& \texttt{AND}(\text{Cond},\text{Cond}) \mid \texttt{OR}(\text{Cond},\text{Cond}) \mid \texttt{NOT}(\text{Cond}) \\
+  \mid{}& \texttt{CheckEnemyAt}(\text{Offset}_x,\,\text{Offset}_y,\,\text{Comparator},\,\text{EnemyKind}) \\
+  \mid{}& \texttt{CheckLandscapeAt}(\text{Offset}_x,\,\text{Offset}_y,\,\text{Comparator},\,\text{TileValue}) \\
+  \mid{}& \texttt{IsMarioOnGround} \mid \texttt{MayMarioJump}
+\end{align*}
+
+Both predicates access the $22\times22$ grid at offset $(\Delta x, \Delta y)$ relative to Mario's cell. Horizontal offsets $\Delta x \in \{0,1,2,3\}$ let the agent look ahead up to four cells; vertical offsets $\Delta y \in \{-3,\ldots,+3\}$ cover above and below. The rationale behind this is that giving it full grid visibility would lead an explosion of possible programs, while this small subset allows for sufficient behaviour exploration while allowing it to learn to react to close threats. Additionally, since the framework stores terrain and enemy data in the same grid, both predicates query the same array and differ only in the value range they compare against: enemy type codes ($2$--$13$) versus tile codes.
+
+An earlier version of the grammar used precomputed boolean predicates computed outside the GP tree (\texttt{hole\_ahead}, \texttt{enemy\_ahead}, \texttt{wall\_ahead}). This simplified the search space but also reduced it: the agent could not, for example, distinguish between enemy types or check arbitrary offsets. Though experiments with this grammar offered interesting insights (discussed below), these changes were reverted in order to align with the project statement's scope.
+
+\paragraph{Terminals.}
+Enemy kind terminals cover all sprite types: Goomba (standard and winged), Red and Green Koopa (standard and winged), Bullet Bill, Spiky (standard and winged), Piranha Flower, and Shell. Tile value terminals are \textsc{HardObstacle} ($-10$), \textsc{Brick} ($16$), and \textsc{EnemyObstacle} ($20$). Action key terminals are \textsc{Right}, \textsc{Left}, \textsc{Jump}, \textsc{Speed}, and \textsc{Down}.
+
+% \paragraph{Initialization.}
+% The provided scaffold includes a \emph{safe grow} initialization procedure that enforces type constraints and targets depths between $3$ and $6$, checking type feasibility before selecting any primitive. DEAP's standard grow method produces degenerate trees near type boundaries in strongly-typed grammars, since it does not account for mandatory argument chains; the safe grow procedure avoids these dead ends and was kept unchanged.
+
+\subsection{Fitness Calculation}
+\label{sec:fitness}
+
+\subsubsection{Stage 1}
+
+The first fitness function uses a very simple pattern:
+
+\begin{equation}
+r_t = \Delta x_t + P_{\text{stuck}}(t)
+\label{eq:step_reward}
+\end{equation}
+
+\paragraph{Forward progress.}
+$\Delta x_t = \mathbf{1}[\,x_t - x_{t-1} \geq 0.61\,]$ awards one point when Mario advances at least $0.61$ world units in a step. The threshold is used so that stationary oscillations near a wall do not accumulate a positive reward, as that would go against the next term of the function.
+
+\paragraph{Stuck penalty.}
+When Mario has made no forward progress for more than $10$ consecutive steps (in order to not penalize legitimate pauses) and a solid obstacle occupies the cell directly ahead, a growing penalty is applied:
+\begin{equation}
+P_{\text{stuck}}(t) = \begin{cases}
+    -10\,(n_{\text{stuck}} - 10) & \text{if } n_{\text{stuck}} > 10 \text{ and obstacle ahead} \\
+    0 & \text{otherwise}
+\end{cases}
+\end{equation}
+The condition additionally requires that no Piranha Flower is present in the column above Mario. This exclusion was added after discussing how the original penalty, which lacked it, could cause agents to rush into Piranha pipes rather than waiting for the enemy to retract.
+
+\paragraph{Airtime penalty.}
+A behavior that soon became apparent in high-fitness individuals was their tendency to jump constantly. We theorized that agents converged to this behaviour because, due to the simplicity of their grammar, it is very hard to reach a proper ruleset of when jumping is favorable. As such, when an individual stumbles into this strategy in the early generations, it offers a massive jump in fitness, causing it to flood the population, which attempts to optimize it until the end of the run. 
+
+In order to counteract this behavior, a penalty proportional to the total air time was initally attempted and iterated over several tests. However, these either failed to prevent the final agent from jumping, or made it impossible for agents to learn to make any progress. This strengthened our belief that, with the current grammar, agents were only given the space to understand that the air is usually safer than the ground (at least in the first three difficulties). It is further supported by the fact that we were able to evolve Marios that did not display this behavior but still jumped over enemies and holes before removing those complex perceptions from our grammar.
+
+\paragraph{Episode average.}
+For the experiments run for the results section, each individual is evaluated over a seed pool $\mathcal{S}$ of $5$ level seeds and $3$ consecutive difficulty levels starting at base difficulty 0. A win bonus ($W = 10{,}000$) is added when the level is cleared. Fitness is the mean reward across all $|\mathcal{S}| \times 3$ episodes:
+\begin{equation}
+F = \frac{1}{|\mathcal{S}|} \sum_{s \in \mathcal{S}} \sum_{d=d_{\text{base}}}^{d_{\text{base}}+2} \!\Bigl(\sum_t r_t + W \cdot \mathbf{1}[\text{win}_{s,d}] + L \cdot \mathbf{1}[\text{lose}_{s,d}]\Bigr)
+\label{eq:fitness}
+\end{equation}
+
+\subsubsection{Stage 2}
+This stage adds a kill reward to the reward function:
+
+\begin{equation}
+r_t = \Delta x_t + P_{\text{stuck}}(t) + R_{\text{kill}}(t)
+\label{eq:step_reward}
+\end{equation}
+
+\paragraph{Kill reward.}
+\TODO{update value when tests are complete}
+Each confirmed kill contributes $10{,}000$ points:
+\begin{equation}
+R_{\text{kill}}(t) = 10{,}000\,\hat{k}_t
+\end{equation}
+Kill detection compares the enemy list between consecutive frames, counting reductions in enemy count while handling the exceptions that occur with enemies from the first three difficulties: Koopa-to-Shell transitions (a Koopa count drop paired with a Shell count rise maintains the enemy list size, but is counted as a kill); enemies falling into pits (filtered by a $y$ position threshold); enemies scrolling off-screen as Mario advances (filtered by horizontal distance); and Piranha Flowers retracting into pipes (detects plausible retractions). A disappearing enemy is counted as a kill only if Mario's vertical velocity at that step is consistent with a stomp bounce, meaning a sign reversal or a deceleration pattern that matches rebounding off the top of an enemy.
+
+This replaced an earlier heuristic that counted kills whenever the number of enemies within a small radius around Mario decreased between frames. That approach produced frequent false positives in crowded sections, inflating the reward signal and leading agents to stand still near enemy clusters rather than completing the level.
+
+\paragraph{Coin reward.}
+\TODO{write description when tests are complete}
+
+\subsection{Evolutionary Algorithm}
+\label{sec:ea}
+
+Table~\ref{tab:params} lists the final parameter configuration.
+
+\begin{table}[t]
+\caption{Evolutionary algorithm parameters used in the main experiments.}
+\label{tab:params}
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Parameter} & \textbf{Value} \\
+\midrule
+Population size & 100 \\
+Generations & 300 \\
+Crossover rate ($p_c$) & 0.6 \\
+Mutation rate ($p_m$) & $1.0 \to 0.4$ (linear over training) \\
+Crossover operator & One-point (\texttt{gp.cxOnePoint}) \\
+Mutation operator & Uniform subtree (\texttt{gp.mutUniform}) \\
+Selection & Double Tournament \\
+\quad Fitness tournament size & $2 \to 7$ (linear over training) \\
+\quad Parsimony tournament size & 1.7 \\
+Max tree height & 10 \\
+Elitism & Top-1 (Hall of Fame) \\
+\bottomrule
 \end{tabular}
 \end{table}
 
+\paragraph{Selection and bloat control.}
+We use Double Tournament selection~\cite{luke2006bloat}, which runs two nested tournaments: the outer selects based on fitness (with a size that grows from 2 to 7 over training), and the inner selects based on tree size with a fractional tournament of size $1.7$, preferring shorter programs when fitness is similar. This avoids adding a size term to the fitness function directly, which requires careful weighting and tends to penalize legitimately complex programs that need more nodes to express a useful behavior.
 
-\noindent Displayed equations are centered and set on a separate
-line.
-\begin{equation}
-x + y = z
-\end{equation}
-Please try to avoid rasterized images for line-art diagrams and
-schemas. Whenever possible, use vector graphics instead (see
-Fig.~\ref{fig1}).
+\paragraph{Crossover and mutation.}
+One-point crossover selects a random node in each parent and swaps the corresponding subtrees. If the resulting offspring exceeds height $10$, the operation is reverted and the parent is preserved. Uniform subtree mutation selects a random node and replaces its subtree with a freshly grown random subtree (depth 2 - 6), so the algorithm introduces genuinely new code fragments rather than only recombining existing material.
 
-\begin{figure}
-\includegraphics[width=\textwidth]{fig1.eps}
-\caption{A figure caption is always placed below the illustration.
-Please note that short captions are centered, while long ones are
-justified by the macro package automatically.} \label{fig1}
+The mutation rate decreases from $1.0$ to $0.4$ over training. Preliminary experiments with fixed rates struggled with keeping an appropriate balance between exploration and exploitation at different points in the experiment. The dynamic schedule addresses both: high mutation early for exploration, lower mutation late for exploitation. The rationale behind the fitness tournament size is the same: it grows linearly so that early generations explore broadly under low selection pressure and later generations converge under stronger pressure once the search has found promising regions.
+
+\paragraph{Elitism.}
+The single best individual across all generations, stored in a Hall of Fame, is copied directly into the next generation at each step. This ensures the best fitness found is never lost to a bad crossover or mutation.
+
+\paragraph{Parallelism.}
+The provided evaluation infrastructure distributes fitness evaluations across $10$ worker processes, each holding a persistent connection to its own simulator instance. We extended it to support multi-seed pools, per-generation difficulty scheduling, and lazy re-evaluation: given the simulation's deterministic nature, only individuals whose fitness was invalidated by a genetic operator need to be re-evaluated.
+
+
+% =============================================================================
+\section{Experimental Design}
+\label{sec:exp}
+% =============================================================================
+
+\subsection{Evaluation Protocol}
+
+All individuals within a generation are evaluated on the same $5$ randomly drawn level seeds, so that fitness values are directly comparable within a generation. Using different seeds per individual, as we did in early experiments, introduced noise that made selection unreliable: an individual with higher fitness might simply have faced an easier level rather than exhibiting a better strategy, which led to the population stagnating on a few lucky seeds rather than improving.
+
+To prevent overfitting to specific levels, the seed pool is rotated every $10$ generations by drawing a fresh set from a universe of $1{,}000$ seeds. At each rotation, all population fitnesses are invalidated and re-evaluated under the new pool; the Hall of Fame champion's fitness is also reset, so its score always reflects the current pool rather than a comparison made against an earlier one. A checkpoint is saved at each rotation. At the end of training, all checkpoints are re-evaluated on a fixed set of $500$ held-out seeds across the three training difficulties ($1{,}500$ episodes per checkpoint). The Hall of Fame champion from the checkpoint with the highest overall win rate on this held-out set is selected as the final evolved agent. This re-evaluation step is necessary because the Hall of Fame score stored in each checkpoint reflects fitness under whichever seed pool was active during that rotation, making raw fitness values across checkpoints incomparable without a shared evaluation basis.
+
+For seed pool rotation, periods of 5, 10, and 20 generations were compared, with the middle option achieving overall better results. Rotating every 5 generations did not give the population enough time to exploit each seed pool before it changed, slowing convergence. Rotating every 20 generations allowed the population to overfit to specific level seeds, with agents that scored well on the current pool but failed to generalize when the pool changed. Rotating every 10 generations provided a good balance: enough stability for selection to act meaningfully, and enough change to prevent overfitting.
+
+The base difficulty $d_{\text{base}}$ is fixed at $0$ throughout training, so agents are always evaluated on difficulties $0$, $1$, and $2$ simultaneously. An earlier design explored a curriculum that gradually shifted $d_{\text{base}}$ upward over generations. This was abandoned when training on all three difficulties from the start produced better-generalizing agents, likely because the easier difficulty levels provide a reliable learning signal even when the population is still immature.
+
+Finally, we chose to run 300-generation runs to fully explore the potential of the evolutionary approach, even though there were clear signs of stagnation after about 100 generations. 200-individual and 100-individual populations were compared, with the latter configuration producing comparable completion rates at half the wall-clock cost, and was adopted as the default.
+
+\subsection{Comparative Baseline}
+
+We compare evolved champions against a random search baseline to isolate the contribution of the evolutionary process from the expressive power of the grammar. We run five independent training experiments, each with a different random seed. For each run, the champion is selected by re-evaluating all checkpoints as described above. The baseline for each run is a single program drawn uniformly at random from the same grammar using the matching seed, with no selection or recombination applied. Both agents are then evaluated on $5{,}000$ held-out level seeds across three difficulty levels ($15{,}000$ episodes per agent), and we report mean and standard deviation across the five runs.
+
+\subsection{Statistical Analysis}
+
+Since both the evolutionary process and the level generator are stochastic, a single run is insufficient to draw reliable conclusions~\cite{doe_lecture}. We run five independent training seeds and evaluate the resulting champions and their matched baselines on $5{,}000$ held-out level seeds across three difficulties, giving $15{,}000$ episodes per agent. We report mean and standard deviation across the five runs for three metrics:
+\begin{itemize}
+    \item \textbf{Completion rate}: percentage of episodes in which the level is cleared before death or timeout.
+    \item \textbf{Max distance}: mean maximum $x$-position reached in episodes that did not result in a level clear.
+    \item \textbf{Enemies killed}: mean number of confirmed kills per episode.
+    \item \textbf{Coins collected}: mean number of coins gathered per episode.
+\end{itemize}
+
+% =============================================================================
+\section{Results and Analysis}
+\label{sec:results}
+% =============================================================================
+
+\subsection{Fitness Convergence}
+
+Figures~\ref{fig:normal_100}, \ref{fig:normal_200}, and~\ref{fig:fire_200} plot the win rate of the best individual (Hall of Fame) at each checkpoint, evaluated on 100 held-out level seeds across the three training difficulties, giving 300 episodes per data point.
+
+In Figure~\ref{fig:normal_100} (population 100, normal mode), at around generation 10 the win rate jumps from near zero to approximately 31\%, with difficulty-0 reaching 65\% in the same checkpoint. From that point the overall win rate stabilizes in the 38--40\% range for the remaining 290 generations, with difficulty-0 peaking near 73\% around generation 150. Performance degrades with difficulty: difficulty-1 settles at roughly 20--33\% and difficulty-2 at 9--18\%, reflecting the increasing obstacle density and enemy variety at higher settings. The gap between the difficulty-0 line and the overall line shows that the agent learned to clear open, low-obstacle levels reliably but struggled to generalize to adversarial layouts. Seed rotation events are visible as short-lived dips at multiples of 10 generations; each dip is followed by recovery within the next rotation period, confirming that the population's strategy is general enough to survive seed-pool changes rather than collapsing on each rotation.
+
+Figure~\ref{fig:normal_200} (population 200, normal mode) shows the same qualitative trajectory with a 40-generation delay: the best agent's overall win rate remains near zero until generation 50, then converges rapidly to the same 38--40\% plateau. The delay is likely due to the larger initial population requiring more episodes before a first viable run-and-jump strategy emerges and propagates. Final performance is nearly identical to the 100-population run, which supports choosing the smaller configuration as the default: the same quality is reached at roughly half the computational cost.
+
+Figure~\ref{fig:fire_200} (population 200, fire mode) shows markedly higher win rates. Difficulty-0 reaches near 100\% from generation 55 onward, difficulty-1 stabilizes between 60--75\%, and difficulty-2 ranges from 34--60\%, giving an overall win rate of 65--70\%. Fire Mario eliminates most enemies with projectiles rather than stomps, which removes the need for precise vertical positioning during kills. Since the grammar and fitness function are identical, the improvement is entirely attributable to the task becoming easier to navigate, , showing the ceiling that normal-mode enemy encounters impose.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.82\textwidth]{images/winrate_vs_gen_normal_100.png}
+  \caption{Win rate vs.\ generation, population size 100, normal Mario mode.}
+  \label{fig:normal_100}
 \end{figure}
 
-\begin{theorem}
-This is a sample theorem. The run-in heading is set in bold, while
-the following text appears in italics. Definitions, lemmas,
-propositions, and corollaries are styled the same way.
-\end{theorem}
-%
-% the environments 'definition', 'lemma', 'proposition', 'corollary',
-% 'remark', and 'example' are defined in the LLNCS documentclass as well.
-%
-\begin{proof}
-Proofs, examples, and remarks have the initial word in italics,
-while the following text appears in normal font.
-\end{proof}
-For citations of references, we prefer the use of square brackets
-and consecutive numbers. Citations using labels or the author/year
-convention are also acceptable. The following bibliography provides
-a sample reference list with entries for journal
-articles~\cite{ref_article1}, an LNCS chapter~\cite{ref_lncs1}, a
-book~\cite{ref_book1}, proceedings without editors~\cite{ref_proc1},
-and a homepage~\cite{ref_url1}. Multiple citations are grouped
-\cite{ref_article1,ref_lncs1,ref_book1},
-\cite{ref_article1,ref_book1,ref_proc1,ref_url1}.
-%
-% ---- Bibliography ----
-%
-% BibTeX users should specify bibliography style 'splncs04'.
-% References will then be sorted and formatted in the correct style.
-%
-% \bibliographystyle{splncs04}
-% \bibliography{mybibliography}
-%
-\begin{thebibliography}{8}
-\bibitem{ref_article1}
-Author, F.: Article title. Journal \textbf{2}(5), 99--110 (2016)
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.82\textwidth]{images/winrate_vs_gen_normal_200.png}
+  \caption{Win rate vs.\ generation, population size 200, normal Mario mode.}
+  \label{fig:normal_200}
+\end{figure}
 
-\bibitem{ref_lncs1}
-Author, F., Author, S.: Title of a proceedings paper. In: Editor,
-F., Editor, S. (eds.) CONFERENCE 2016, LNCS, vol. 9999, pp. 1--13.
-Springer, Heidelberg (2016). \doi{10.10007/1234567890}
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.82\textwidth]{images/winrate_vs_gen_fire_200.png}
+  \caption{Win rate vs.\ generation, population size 200, fire Mario mode.}
+  \label{fig:fire_200}
+\end{figure}
 
-\bibitem{ref_book1}
-Author, F., Author, S., Author, T.: Book title. 2nd edn. Publisher,
-Location (1999)
+\subsection{Evolved Agent vs.\ Random Search Baseline}
 
-\bibitem{ref_proc1}
-Author, A.-B.: Contribution title. In: 9th International Proceedings
-on Proceedings, pp. 1--2. Publisher, Location (2010)
+Table~\ref{tab:comparison} compares the champion agent against the random search baseline across $N = 5$ held-out seeds and 3 difficulty levels.
 
-\bibitem{ref_url1}
-LNCS Homepage, \url{http://www.springer.com/lncs}. Last accessed 4
-Oct 2017
-\end{thebibliography}
+\begin{table}[t]
+\caption{Evolved champion vs.\ random search baseline ($N = 5$ held-out seeds $\times$ 3 difficulties, mean $\pm$ std). \TODO{Fill in all values.}}
+\label{tab:comparison}
+\centering
+\begin{tabular}{lccc}
+\toprule
+\textbf{Metric} & \textbf{Random Search (Avg $\pm$ Std)} & \textbf{Evolved Agent (Avg $\pm$ Std)} & \textbf{Improvement} \\
+\midrule
+Levels Cleared (\%) & \TODO{X} & \TODO{Y} & \TODO{+Z\%} \\
+Max Distance (px)   & \TODO{X} & \TODO{Y} & \TODO{+Z\%} \\
+Enemies Killed      & \TODO{X} & \TODO{Y} & \TODO{+Z\%} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\TODO{Comment on the table. Describe the qualitative difference in behavior: the random agent will jump and move without a coordinated strategy, while the evolved agent should show consistent forward movement and at minimum a learned response to walls and pits. Discuss whether the improvement is meaningful given the observed standard deviations, or whether the variance is too large to draw firm conclusions.}
+
+\subsection{Qualitative Analysis of Evolved Behavior}
+
+The best individual found in the 100-population normal-mode run (Hall of Fame score: 51114) is shown below.
+
+\begin{small}
+\begin{verbatim}
+def corre(action, landscape, enemies, can_jump,
+          on_ground, mario_pos, Mario, Sprite, **kwargs):
+
+    if (enemies[11+-1][11+1] < 8):
+        if (not (landscape[11+1][11+3] > 16)):
+            if (enemies[11+-1][11+1] < 12):
+                if (not (on_ground or on_ground)):
+                    action[Mario.KEY_RIGHT] = 1
+                else:
+                    action[Mario.KEY_SPEED] = 1
+        else:
+            action[Mario.KEY_SPEED] = 1
+    if ((not (on_ground or ((enemies[11+0][11+2] < 13)
+         and ((enemies[11+0][11+-3] == 13) or on_ground))))
+         or can_jump):
+        action[Mario.KEY_JUMP] = 1
+    else:
+        if (landscape[11+0][11+3] < 16):
+            if (not (enemies[11+-2][11+0] == 8)):
+                if can_jump:
+                    if (enemies[11+3][11+0] == 8):
+                        if can_jump:
+                            action[Mario.KEY_SPEED] = 0
+                        else:
+                            if on_ground:
+                                action[Mario.KEY_LEFT] = 1
+                    else:
+                        if (can_jump and on_ground):
+                            if on_ground:
+                                action[Mario.KEY_RIGHT] = 1
+                        else:
+                            if can_jump:
+                                action[Mario.KEY_LEFT] = 1
+                            else:
+                                action[Mario.KEY_RIGHT] = 1
+            else:
+                if can_jump:
+                    if (enemies[11+3][11+3] < 8):
+                        if can_jump:
+                            if can_jump:
+                                action[Mario.KEY_DOWN] = 0
+                            else:
+                                action[Mario.KEY_LEFT] = 0
+        else:
+            if can_jump:
+                action[Mario.KEY_JUMP] = 0
+\end{verbatim}
+\end{small}
+
+The program consists of two sequential statements. The first block handles the speed decision: it checks for an enemy of type $< 8$ (Goomba or empty) one cell above and one cell ahead, and, if no tile with code $> 16$ (i.e., no enemy obstacle) blocks the path three columns ahead at ground level, sets \textsc{Speed}. This increases forward momentum whenever a low-threat enemy is nearby and the terrain ahead is passable.
+
+The second block encodes the dominant behavior. Its condition, \texttt{(not (on\_ground or \ldots)) or can\_jump}, simplifies to \texttt{can\_jump} on almost every ground-contact frame, meaning the agent jumps on every step it is able to. The result is a controller that runs right and jumps continuously, with the speed modulation in the first block providing the only enemy-sensitive adjustment.
+
+The tree contains several introns. \texttt{on\_ground or on\_ground} evaluates identically to \texttt{on\_ground} but occupies two leaf nodes and one OR node. The else branch of the jump condition (lines 18--44) covers the brief window when Mario is grounded but \texttt{can\_jump} is false; since this window lasts only a few frames per landing, most of the nested conditions in that branch are rarely reached during a normal episode. Parsimony pressure kept the tree from growing further but did not eliminate these segments, since their size contribution was small enough to survive the parsimony tournament.
+
+The agent's primary failure mode is the absence of spatial lookahead in the jump decision: the jump fires based on \texttt{can\_jump} alone, without checking whether a pit or an obstacle lies ahead. On higher-difficulty levels with more pits and denser enemy placement, this causes the agent to launch itself into gaps it could have avoided, which accounts for the sharp drop in win rate from difficulty~0 to difficulty~2.
+
+
+% =============================================================================
+\section{Conclusion}
+\label{sec:conclusion}
+% =============================================================================
+
+\TODO{Write after results are confirmed. Structure: (1) one paragraph restating the approach and the two objectives. (2) The most impactful design choices, with results woven in, e.g., ``Switching to the type-aware kill detector raised confirmed kills per episode from X to Y; the radius heuristic had attributed those same kills to off-screen scrolling.'' (3) Limitations: fixed-arity grammar with no loops or arithmetic, evaluation cost constraining population size, sensitivity to kill-reward weighting relative to the progress signal. (4) Future directions: extending the grammar with loops and numeric comparisons, island models to maintain diversity across subpopulations, and adaptive operator tuning via CMA-ES.}
+
+
+\bibliographystyle{splncs04}
+\bibliography{references}
+
 \end{document}
+
+
+%%% ============================================================
+%%%  REPORT TODO LIST
+%%% ============================================================
+%%%
+%%%  BLOCKING (need data before writing):
+%%%  [ ] Abstract: 2 sentences with key results (win rate, improvement over random).
+%%%  [x] Sec 5.1: convergence discussion written from the three plot images.
+%%%  [ ] Table 2: fill all cells (Levels Cleared %, Max Distance, Enemies Killed)
+%%%      for both Random Search and Evolved Agent. Run evaluate_best_agent.py and
+%%%      a comparable random baseline on 5 held-out seeds × 3 difficulties.
+%%%  [ ] Sec 5.2 comments: qualitative difference in behavior; significance given std.
+%%%  [x] Sec 5.3: best individual pasted and analyzed (gp_mario_best.py).
+%%%  [ ] Sec 6 (Conclusion): write after Table 2 is filled.
+%%%
+%%%  CLARIFICATIONS (resolved):
+%%%  [x] --difficulty-shift: fixed at 0 throughout. Curriculum shift was explored
+%%%      and abandoned; training on all 3 difficulties simultaneously from the
+%%%      start produced better generalization. Now in the text.
+%%%  [x] Seed rotation: 10 > 5 (too noisy) and 10 > 20 (overfitting). Now in text.
+%%%  [x] Mario mode: default 0 (small Mario) in all main experiments.
+%%%  [x] Champion evaluation: 3 difficulties × 5 held-out seeds. Confirmed.
+%%%  [x] Statistical evaluation: 5 held-out seeds (not 5 independent full runs).
+%%%
+%%%  STILL OPEN:
+%%%  [ ] Fire-mode figure (Fig. 3) used 200-pop — treat as secondary / leave for
+%%%      later. If comparing pop sizes, do it in its own ablation entry; otherwise
+%%%      just present 100-pop as the main setting and note fire mode separately.
+%%%
+%%%  POLISH (low priority, do last):
+%%%  [ ] Add axis labels to all 3 figures.
+%%%  [ ] Revise intro final paragraph once results are in.
+%%%  [ ] Verify author emails in \institute.
+%%%  [ ] Optional: add a figure showing the compiled code of the best individual.
+%%% ============================================================
+
+% make it so that references appear in the order they are referenced
+% see if all references are truly necessary
