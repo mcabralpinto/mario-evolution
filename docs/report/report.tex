@@ -114,7 +114,7 @@ r_t = \Delta x_t + P_{\text{stuck}}(t)
 \end{equation}
 
 \paragraph{Forward progress.}
-$\Delta x_t = \mathbf{1}[\,x_t - x_{t-1} \geq 0.61\,]$ awards one point when Mario advances at least $0.61$ world units in a step. The threshold is used so that stationary oscillations near a wall do not accumulate a positive reward, as that would go against the next term of the function.
+$\Delta x_t = \mathbf{1}[\,x_t - x_{t-1} \geq 0.61\,]$ awards one point when Mario advances at least $0.61$ world units in a step. The binary nature of the function ensures that Mario doesn't get rewarded for running fast for no substantial gain, walking or speeding is the same (walking is most of the times efficient because it allows for better reasoning and control). The threshold is used so that stationary oscillations near a wall do not accumulate a positive reward, as that would go against the next term of the function.
 
 \paragraph{Stuck penalty.}
 When Mario has made no forward progress for more than $10$ consecutive steps (in order to not penalize legitimate pauses) and a solid obstacle occupies the cell directly ahead, a growing penalty is applied:
@@ -223,6 +223,15 @@ Finally, we chose to run 300-generation runs to fully explore the potential of t
 
 We compare evolved champions against a random search baseline to isolate the contribution of the evolutionary process from the expressive power of the grammar. We run five independent training experiments, each with a different random seed. For each run, the champion is selected by re-evaluating all checkpoints as described above. The baseline for each run is a single program drawn uniformly at random from the same grammar using the matching seed, with no selection or recombination applied. Both agents are then evaluated on $5{,}000$ held-out level seeds across three difficulty levels ($15{,}000$ episodes per agent), and we report mean and standard deviation across the five runs.
 
+As a further comparison, we replicated the full experiment with Mario initialised as
+\textit{big Mario} carrying a fire flower (hereafter \textit{Fire Mario}).
+The grammar was extended with a \texttt{fire} action, but all training and evaluation
+parameters---population size, generations, seed‑pool rotation, checkpoint selection,
+and held‑out set size---remained identical.
+Descriptive statistics for Fire Mario are presented together with the normal Mario
+results in Table~\ref{tab:results}. Formal significance testing was reserved for the
+primary (normal‑Mario) comparison.
+
 \subsection{Statistical Analysis}
 
 Since both the evolutionary process and the level generator are stochastic, a single run is insufficient to draw reliable conclusions~\cite{doe_lecture}. We run five independent training seeds and evaluate the resulting champions and their matched baselines on $5{,}000$ held-out level seeds across three difficulties, giving $15{,}000$ episodes per agent. We report mean and standard deviation across the five runs for three metrics:
@@ -232,6 +241,9 @@ Since both the evolutionary process and the level generator are stochastic, a si
     \item \textbf{Enemies killed}: mean number of confirmed kills per episode.
     \item \textbf{Coins collected}: mean number of coins gathered per episode.
 \end{itemize}
+
+To quantify the reliability of the observed advantage of the evolved normal Mario agents over the random baseline, we conducted paired-sample \textit{t}-tests on completion rates, enemies killed, and coins collected. The results indicated that \TODO{insert whether differences were statistically significant and in which metrics}.
+
 
 % =============================================================================
 \section{Results and Analysis}
