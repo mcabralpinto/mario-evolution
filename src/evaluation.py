@@ -13,9 +13,8 @@ N_PROCESSES = 5
 # Task Definition
 TASK_TO_SOLVE = HunterTask
 
-#COIN_WEIGHT = 10
 WIN_REWARD = 10000.0
-LOSE_PENALTY = -WIN_REWARD / 2
+#LOSE_PENALTY = -WIN_REWARD / 2
 N_EVAL_SEEDS = 3
 MAX_EVAL_DIFFICULTIES = 3  # window size; base shifts upward over training
 TOTAL_GENERATIONS = 0
@@ -53,6 +52,10 @@ def evaluate_agent(agent, task: Task, seed_pool=None, base_difficulty=0):
 
             if task.status == 1:
                 seed_reward += WIN_REWARD
+                
+            if isinstance(task, HunterTask):
+                # Add coin reward for HunterTask
+                seed_reward += task.coin_reward * task.coins
 
         total_reward += seed_reward
 

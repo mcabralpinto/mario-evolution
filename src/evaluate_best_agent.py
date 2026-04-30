@@ -13,8 +13,8 @@ import pickle as pkl
 import inspect
 import importlib.util
 
-SEED_START = 10000
-SEED_N = 100
+SEED_START = 20000
+SEED_N = 1000
 DISPLAY_SEED_N = 5
 DISPLAY_DIFFICULTIES = 3
 
@@ -134,21 +134,6 @@ def evaluate_code_agent(suffix="", display=False, seed_start=SEED_START, seed_n=
         n = counts_per_diff[d]
         w = wins_per_diff[d]
         print(f"  Diff {d}: {w}/{n} wins ({w/n:.2%})")
-
-
-def evaluate_mlp_agent():
-    agent = MLPAgent()
-    task = MoveForwardTask(visualization=True, port=4243)
-    exp = marioai.Experiment(task, agent)
-
-    with open(f'{sys.argv[1]}', 'rb') as f:
-        best_params = pkl.load(f)
-
-    agent.set_param_vector(best_params)
-    exp.max_fps = 60
-    task.env.level_type = 0
-    rewards = exp.doEpisodes()
-    print(sum(rewards[0]))
 
 
 if __name__ == '__main__':

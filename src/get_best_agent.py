@@ -38,7 +38,7 @@ def _load_checkpoint(path):
 # --- configure here ---
 SEED_CHECKPOINTS_DIR = Path("data/seed_checkpoints")
 SEED_START = 10000
-SEED_N = 100
+SEED_N = 500
 DISPLAY_DIFFICULTIES = 3
 # ----------------------
 
@@ -87,7 +87,7 @@ def main():
     best_overall = -1.0
     best_code = None
 
-    for path, gen in tqdm(checkpoints, desc="Checkpoints"):
+    for path, gen in tqdm(checkpoints, desc="Checkpoints"):           
         print(f"\n--- Evaluating checkpoint gen={gen}: {path} ---")
         code = extract_best_code(path)
         overall_wr, per_diff = evaluate_from_code(code, seed_start=SEED_START, seed_n=SEED_N,

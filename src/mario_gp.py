@@ -495,6 +495,7 @@ if __name__ == "__main__":
                     for ind in hof:
                         del ind.fitness.values
                     Path("data/seed_checkpoints").mkdir(parents=True, exist_ok=True)
+                    Path("data/checkpoints").mkdir(parents=True, exist_ok=True)
                     save_checkpoint(pop, hof, gen, args, seed_pool,
                                     filepath=f"data/seed_checkpoints/checkpoint_gen_{gen}.pkl")
 
@@ -508,6 +509,10 @@ if __name__ == "__main__":
                 hof.update(pop)
                 record = stats.compile(pop)
                 print(f"\033[91mMax:\033[0m {record['max']:.3f}, \033[94mMin:\033[0m {record['min']:.3f}, \033[92mAvg:\033[0m {record['avg']:.3f}, \033[93mStd:\033[0m {record['std']:.3f}")
+
+                if gen == NGEN - 1:
+                    save_checkpoint(pop, hof, gen, args, seed_pool,
+                                filepath=f"data/seed_checkpoints/checkpoint_{NGEN}.pkl")
 
         except KeyboardInterrupt:
             print("\nInterrupted.")
@@ -534,6 +539,7 @@ if __name__ == "__main__":
                     for ind in hof:
                         del ind.fitness.values
                     Path("data/seed_checkpoints").mkdir(parents=True, exist_ok=True)
+                    Path("data/checkpoints").mkdir(parents=True, exist_ok=True)
                     save_checkpoint(pop, hof, gen, args, seed_pool,
                                     filepath=f"data/seed_checkpoints/checkpoint_gen_{gen}.pkl")
 
@@ -577,6 +583,10 @@ if __name__ == "__main__":
 
                 # Replace population
                 pop[:] = offspring
+                
+                if gen == NGEN - 1:
+                    save_checkpoint(pop, hof, gen, args, seed_pool,
+                                filepath=f"data/seed_checkpoints/checkpoint_{NGEN}.pkl")
 
         except KeyboardInterrupt:
             print("\nInterrupted.")
@@ -599,4 +609,4 @@ if __name__ == "__main__":
     print(f"\nBest Fitness Found: {best_ind.fitness.values[0]}")
     save_best_individual(best_ind, toolbox, filename_py="gp_mario_best.py")
 
-# .\env\Scripts\python.exe -m src.mario_gp --pop 200 --gen 300
+# .\env\Scripts\python.exe -m src.mario_gp --pop 100 --gen 300

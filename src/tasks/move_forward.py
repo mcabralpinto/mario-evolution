@@ -13,21 +13,28 @@ class MoveForwardTask(Task):
         self.total_reward = 0
 
     def compute_reward(self, current_obs, last_obs):
-        if last_obs is None:
-            return 0.0
-
-        reward = 0.0
-
-        delta_distance = current_obs.distance - last_obs.distance
-        forward_progress = max(delta_distance, 0)
-        reward += (forward_progress ** 1.2) * 0.1
-
-        if forward_progress < 0.61:
+        self.steps += 1
+        mx, my = current_obs.mario_pos
+        last_mx, _ = last_obs.mario_pos if last_obs else (mx, my)  
+        
+        # MOVING REWARD
+        delta_x = int(mx - last_mx >= 0.61)
+    
+        
+        # STUCK PENALTY
+        stuck_penalty = 0.0
+        if delta_x == 0:
             self.no_progress_steps += 1
-            if self.no_progress_steps >= 5:
-                reward -= 5.0
         else:
             self.no_progress_steps = 0
+        if self.no_progress_steps > 10: 
+            # if mario is stuck for 10 steps and there is an obstacle in front of him, penalize
+            stuck_penalty = -10 * (self.no_progress_steps - 10)
 
-        self.total_reward += reward
-        return reward
+        # DEBUG PRINT
+        if (self.steps % 5 == 0 and self.debug):     
+            for row in current_obs.level_scene:
+                print(" ".join(f"{int(cell):>3}" for cell in row))
+            print()
+
+        return delta_x + stuck_penalty

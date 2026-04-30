@@ -2,9 +2,9 @@ from numpy import rint
 
 from src.marioai.task import Task
 
-_KOOPA_TYPES = frozenset({3, 4, 5, 6})
-_SHELL_TYPES = frozenset({7, 8})
-_PIRANHA_TYPE = 9
+_KOOPA_TYPES = frozenset({4, 5, 6, 7})
+_SHELL_TYPES = frozenset({9, 10})
+_PIRANHA_TYPE = 12
 _SCROLL_DISTANCE = 160   # 10 blocks * 16px
 _PIT_Y_THRESHOLD = 240   # bottom border is 256
 
@@ -22,6 +22,9 @@ class HunterTask(Task):
         
         self.obstacles = [-11, -10, 16, 20]
         self.enemy_types = [2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 13]
+        
+        self.coin_reward = 2500
+        self.kill_reward = 10000
         
         self.debug = False
         self.beta = False
@@ -116,10 +119,12 @@ class HunterTask(Task):
     def compute_reward(self, current_obs, last_obs):
         self.steps += 1
         mx, my = current_obs.mario_pos
-        last_mx, last_my = last_obs.mario_pos if last_obs else (mx, my)
+        last_mx, _ = last_obs.mario_pos if last_obs else (mx, my)  
+        
         # MOVING REWARD
         delta_x = int(mx - last_mx >= 0.61)
-        # STUCK PENALTY - maybe overhaul to only include cases where he is clearly stuck on a wall
+        
+        # STUCK PENALTY
         stuck_penalty = 0.0
         if delta_x == 0:
             self.no_progress_steps += 1
@@ -129,14 +134,13 @@ class HunterTask(Task):
             self.no_progress_steps > 10 and 
             current_obs.level_scene[11][12] in self.obstacles and
             not any(current_obs.level_scene[i][j] == 12 for i in range(0, 12) for j in range(12, 14)) # piranha above
-        ): 
+        ):
             # if mario is stuck for 10 steps and there is an obstacle in front of him, penalize
             stuck_penalty = -10 * (self.no_progress_steps - 10)
-            # print(f"PENALTY FOR STALLING: {stuck_penalty} (no progress for {self.no_progress_steps} steps)")
         
-        kill_reward = self.detect_kills(current_obs, last_obs) * 10000
+        # KILL REWARD
+        kill_reward = self.detect_kills(current_obs, last_obs) * self.kill_reward
 
-        # print(self.kills)
         # DEBUG PRINT
         if (self.steps % 5 == 0 and self.debug):     
             for row in current_obs.level_scene:
