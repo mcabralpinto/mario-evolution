@@ -34,6 +34,9 @@
 - overhaul stuck penalty - now only when truly stuck and not waiting (19/4)
 - simple enemy penalty - similar to what we had before (19/4)
 
+- kill detection function (explain below) (28/4)
+    - mention old function (at the end of document) and current one (in the hunter.py func)
+
 # MISC
 
 - added to observation/fit function
@@ -67,6 +70,8 @@
         - every 20 seeds: worse results! (see why)
         - every 10 seeds: bad result! leads to next point
     - get checkpoint at each seed new seed insertion; evaluate best at end (26/04)
+        - results show stagnation after first good result. 200 gens is probably enough at a budget.
+    - attempt 100 instead of 200pop (29/04) -> comparable results! start using 100 pop
 
 - checkpoints
 
@@ -88,17 +93,12 @@
 
 - evolutionary strategies
 
-- handle enemies directly
-    - goombas: penalize direct contact
-    - piranhas: make mario stop when they are above a tube (or above him?) then move once they aren't 
-
-- rethink win reward (decrease? add conditions?)
-
 - add any/all/for to grammar?
 
-- increase jump pen
 
-# old detection (simple heuristic)
+
+
+### old detection (simple heuristic)
 
     def enemies_in_radius(self, obs, radius):
         e = []
