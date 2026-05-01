@@ -4,8 +4,10 @@ Plot win rate vs generation for a series of GP checkpoints.
 Edit CHECKPOINTS below: list of (checkpoint_path, generation_number) tuples.
 """
 import sys
+import argparse
 import pickle
 import io
+import datetime
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -14,6 +16,7 @@ from tqdm import tqdm
 
 from src.mario_gp import compile_individual
 from src.evaluate_best_agent import evaluate_from_code
+from src.tasks import RunnerTask, HunterTask, ThiefTask
 
 
 class _CheckpointUnpickler(pickle.Unpickler):
@@ -53,12 +56,19 @@ def extract_best_code(checkpoint_path):
     return compile_individual(best)
 
 
-def save_best_to_gp_mario_best(code: str, overall_wr: float):
-    out_path = Path("data/gp_best_agents/gp_mario_best.py")
+def save_best_to_gp_mario_best(code: str, result, out_path: Path = None):
+    if out_path is None:
+        out_path = Path("data/gp_best_agents/gp_mario_best.py")
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    header = f"# Evolved Mario Controller\n# Win Rate: {overall_wr:.4f}\n"
+    header = (f"# Evolved Mario Controller\n"
+              f"# Win Rate: {result.win_rate:.4f}\n"
+              f"# Avg Progress (unbeaten): {result.avg_progress:.2f}\n"
+              f"# Avg Kills: {result.avg_kills:.4f}\n"
+              f"# Avg Coins: {result.avg_coins:.4f}\n")
+    print(f"Saved best agent to '{out_path}' "
+          f"(wr={result.win_rate:.2%}, progress={result.avg_progress:.1f}, "
+          f"kills={result.avg_kills:.4f}, coins={result.avg_coins:.4f})")
     out_path.write_text(header + "\n" + code.lstrip())
-    print(f"Saved best agent (win rate {overall_wr:.2%}) to '{out_path}'")
 
 
 def discover_checkpoints(directory: Path):
@@ -74,6 +84,27 @@ def discover_checkpoints(directory: Path):
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Evaluate GP checkpoints and select the best agent.")
+    parser.add_argument("--hunter", action="store_true",
+                        help="Hunter mode: select by avg_kills + 0.25*avg_coins, plot kills and coins.")
+    parser.add_argument("--thief", action="store_true",
+                        help="Thief mode: select by avg_coins, plot coins.")
+    parser.add_argument("--seed", type=int, default=None,
+                        help="Training seed (used for output file naming).")
+    args = parser.parse_args()
+    if args.hunter and args.thief:
+        parser.error("--hunter and --thief are mutually exclusive")
+
+    task_name = "hunter" if args.hunter else ("thief" if args.thief else "runner")
+    if args.seed is not None:
+        chart_path = Path("data/charts") / f"{task_name}_seed_{args.seed}.png"
+        agent_out_path = Path("data/agents") / f"{task_name}_seed_{args.seed}.py"
+    else:
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        chart_path = Path("data/charts") / f"{task_name}_{timestamp}.png"
+        agent_out_path = None
+    chart_path.parent.mkdir(parents=True, exist_ok=True)
+
     checkpoints = discover_checkpoints(SEED_CHECKPOINTS_DIR)
     if not checkpoints:
         print(f"No checkpoints found in '{SEED_CHECKPOINTS_DIR}'.")
@@ -81,45 +112,146 @@ def main():
 
     print(f"Found {len(checkpoints)} checkpoint(s): generations {[g for _, g in checkpoints]}")
 
+    task_cls = HunterTask if args.hunter else (ThiefTask if args.thief else RunnerTask)
     generations = []
-    win_rates = []
-    diff_win_rates = {d: [] for d in range(DISPLAY_DIFFICULTIES)}
-    best_overall = -1.0
     best_code = None
+    best_result = None
 
-    for path, gen in tqdm(checkpoints, desc="Checkpoints"):           
-        print(f"\n--- Evaluating checkpoint gen={gen}: {path} ---")
-        code = extract_best_code(path)
-        overall_wr, per_diff = evaluate_from_code(code, seed_start=SEED_START, seed_n=SEED_N,
-                                                  display_difficulties=DISPLAY_DIFFICULTIES)
-        print(f"  Win rate: {overall_wr:.2%}  |  " +
-              "  ".join(f"D{d}: {per_diff[d]:.2%}" for d in range(DISPLAY_DIFFICULTIES)))
-        generations.append(gen)
-        win_rates.append(overall_wr * 100)
+    if args.hunter:
+        avg_kills_list = []
+        win_rates = []
+        best_score = -1.0
+
+        for path, gen in tqdm(checkpoints, desc="Checkpoints"):
+            print(f"\n--- Evaluating checkpoint gen={gen}: {path} ---")
+            code = extract_best_code(path)
+            result = evaluate_from_code(code, task_cls=task_cls,
+                                        seed_start=SEED_START, seed_n=SEED_N,
+                                        display_difficulties=DISPLAY_DIFFICULTIES)
+            print(f"  Win rate: {result.win_rate:.2%}  |  avg_kills: {result.avg_kills:.4f}"
+                  f"  |  avg_progress: {result.avg_progress:.1f}  |  avg_coins: {result.avg_coins:.4f}")
+            generations.append(gen)
+            avg_kills_list.append(result.avg_kills)
+            win_rates.append(result.win_rate * 100)
+
+            if result.avg_kills > best_score:
+                best_score = result.avg_kills
+                best_result = result
+                best_code = code
+
+        if best_code is not None:
+            save_best_to_gp_mario_best(best_code, best_result, out_path=agent_out_path)
+
+        _, ax1 = plt.subplots(figsize=(10, 5))
+        ax2 = ax1.twinx()
+
+        ax1.plot(generations, avg_kills_list, marker="o", linewidth=2, color="red", label="Avg Kills")
+        ax2.plot(generations, win_rates, marker="o", linewidth=2, color="blue", linestyle="--", label="Win Rate (%)")
+
+        ax1.set_xlabel("Generation")
+        ax1.set_ylabel("Avg Kills per Episode", color="red")
+        ax1.tick_params(axis="y", labelcolor="red")
+        ax2.set_ylabel("Win Rate (%)", color="blue")
+        ax2.tick_params(axis="y", labelcolor="blue")
+        ax1.grid(True, alpha=0.4)
+
+        lines = ax1.get_lines() + ax2.get_lines()
+        ax1.legend(lines, [l.get_label() for l in lines], loc="upper left")
+
+        plt.title("Hunter Mode: Avg Kills & Win Rate vs Generation")
+        plt.tight_layout()
+        plt.savefig(chart_path, dpi=150)
+        print(f"\nPlot saved to {chart_path}")
+        plt.show()
+
+    elif args.thief:
+        avg_coins_list = []
+        win_rates = []
+        best_score = -1.0
+
+        for path, gen in tqdm(checkpoints, desc="Checkpoints"):
+            print(f"\n--- Evaluating checkpoint gen={gen}: {path} ---")
+            code = extract_best_code(path)
+            result = evaluate_from_code(code, task_cls=task_cls,
+                                        seed_start=SEED_START, seed_n=SEED_N,
+                                        display_difficulties=DISPLAY_DIFFICULTIES)
+            print(f"  Win rate: {result.win_rate:.2%}  |  avg_coins: {result.avg_coins:.4f}"
+                  f"  |  avg_progress: {result.avg_progress:.1f}  |  avg_kills: {result.avg_kills:.4f}")
+            generations.append(gen)
+            avg_coins_list.append(result.avg_coins)
+            win_rates.append(result.win_rate * 100)
+
+            if result.avg_coins > best_score:
+                best_score = result.avg_coins
+                best_result = result
+                best_code = code
+
+        if best_code is not None:
+            save_best_to_gp_mario_best(best_code, best_result, out_path=agent_out_path)
+
+        _, ax1 = plt.subplots(figsize=(10, 5))
+        ax2 = ax1.twinx()
+
+        ax1.plot(generations, avg_coins_list, marker="o", linewidth=2, color="gold", label="Avg Coins")
+        ax2.plot(generations, win_rates, marker="o", linewidth=2, color="blue", linestyle="--", label="Win Rate (%)")
+
+        ax1.set_xlabel("Generation")
+        ax1.set_ylabel("Avg Coins per Episode", color="goldenrod")
+        ax1.tick_params(axis="y", labelcolor="goldenrod")
+        ax2.set_ylabel("Win Rate (%)", color="blue")
+        ax2.tick_params(axis="y", labelcolor="blue")
+        ax1.grid(True, alpha=0.4)
+
+        lines = ax1.get_lines() + ax2.get_lines()
+        ax1.legend(lines, [l.get_label() for l in lines], loc="upper left")
+
+        plt.title("Thief Mode: Avg Coins & Win Rate vs Generation")
+        plt.tight_layout()
+        plt.savefig(chart_path, dpi=150)
+        print(f"\nPlot saved to {chart_path}")
+        plt.show()
+
+    else:
+        win_rates = []
+        diff_win_rates = {d: [] for d in range(DISPLAY_DIFFICULTIES)}
+        best_score = -1.0
+
+        for path, gen in tqdm(checkpoints, desc="Checkpoints"):
+            print(f"\n--- Evaluating checkpoint gen={gen}: {path} ---")
+            code = extract_best_code(path)
+            result = evaluate_from_code(code, task_cls=task_cls,
+                                        seed_start=SEED_START, seed_n=SEED_N,
+                                        display_difficulties=DISPLAY_DIFFICULTIES)
+            print(f"  Win rate: {result.win_rate:.2%}  |  avg_progress: {result.avg_progress:.1f}"
+                  f"  |  " + "  ".join(f"D{d}: {result.win_rate_per_diff[d]:.2%}"
+                                       for d in range(DISPLAY_DIFFICULTIES)))
+            generations.append(gen)
+            win_rates.append(result.win_rate * 100)
+            for d in range(DISPLAY_DIFFICULTIES):
+                diff_win_rates[d].append(result.win_rate_per_diff.get(d, 0.0) * 100)
+
+            if result.win_rate > best_score:
+                best_score = result.win_rate
+                best_result = result
+                best_code = code
+
+        if best_code is not None:
+            save_best_to_gp_mario_best(best_code, best_result, out_path=agent_out_path)
+
+        plt.figure(figsize=(10, 6))
+        plt.plot(generations, win_rates, marker="o", linewidth=2, label="Overall", color="blue")
         for d in range(DISPLAY_DIFFICULTIES):
-            diff_win_rates[d].append(per_diff.get(d, 0.0) * 100)
-
-        if overall_wr > best_overall:
-            best_overall = overall_wr
-            best_code = code
-
-    if best_code is not None:
-        save_best_to_gp_mario_best(best_code, best_overall)
-
-    plt.figure(figsize=(10, 6))
-    plt.plot(generations, win_rates, marker="o", linewidth=2, label="Overall", color="blue")
-    for d in range(DISPLAY_DIFFICULTIES):
-        plt.plot(generations, diff_win_rates[d], marker="o", linewidth=1.5, linestyle="--",
-                 label=DIFF_LABELS[d], color=DIFF_COLORS[d])
-    plt.xlabel("Generation")
-    plt.ylabel("Win Rate (%)")
-    plt.title("Best Agent Win Rate vs Generation")
-    plt.legend()
-    plt.grid(True, alpha=0.4)
-    plt.tight_layout()
-    plt.savefig("data/winrate_vs_gen.png", dpi=150)
-    print("\nPlot saved to data/winrate_vs_gen.png")
-    plt.show()
+            plt.plot(generations, diff_win_rates[d], marker="o", linewidth=1.5, linestyle="--",
+                     label=DIFF_LABELS[d], color=DIFF_COLORS[d])
+        plt.xlabel("Generation")
+        plt.ylabel("Win Rate (%)")
+        plt.title("Best Agent Win Rate vs Generation")
+        plt.legend()
+        plt.grid(True, alpha=0.4)
+        plt.tight_layout()
+        plt.savefig(chart_path, dpi=150)
+        print(f"\nPlot saved to {chart_path}")
+        plt.show()
 
 
 if __name__ == "__main__":

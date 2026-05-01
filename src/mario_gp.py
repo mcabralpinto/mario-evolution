@@ -10,9 +10,10 @@ import datetime
 from pathlib import Path
 from typing import Any, cast
 
-from src.evaluation import evaluate, evaluate_population, terminate_evaluation_pool, set_total_generations #, increase_difficulty
+from src.evaluation import evaluate, evaluate_population, terminate_evaluation_pool, set_total_generations, set_task_class #, increase_difficulty
 import src.marioai as marioai
 from src.agents import CodeAgent, Mario, Sprite
+from src.tasks import RunnerTask, HunterTask, ThiefTask
 from deap import base, creator, tools, gp
 
 
@@ -398,6 +399,8 @@ def load_checkpoint(filepath):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--hunter", action="store_true", help="Train with HunterTask fitness")
+    parser.add_argument("--thief", action="store_true", help="Train with ThiefTask fitness")
     parser.add_argument("--gen", type=int, default=10)
     parser.add_argument("--pop", type=int, default=20)
     parser.add_argument("--max_height", type=int, default=10)
@@ -424,6 +427,15 @@ if __name__ == "__main__":
                         help="Keep mutation rate and tournament size fixed (MUTPB=0.8, fitness_size=5). "
                              "Default: dynamic schedule (explore early, exploit late).")
     args = parser.parse_args()
+    if args.hunter and args.thief:
+        parser.error("--hunter and --thief are mutually exclusive")
+
+    if args.hunter:
+        set_task_class(HunterTask)
+    elif args.thief:
+        set_task_class(ThiefTask)
+    else:
+        set_task_class(RunnerTask)
 
     random.seed(args.seed)
 
@@ -512,7 +524,7 @@ if __name__ == "__main__":
 
                 if gen == NGEN - 1:
                     save_checkpoint(pop, hof, gen, args, seed_pool,
-                                filepath=f"data/seed_checkpoints/checkpoint_{NGEN}.pkl")
+                                filepath=f"data/seed_checkpoints/checkpoint_gen_{NGEN}.pkl")
 
         except KeyboardInterrupt:
             print("\nInterrupted.")
@@ -586,7 +598,7 @@ if __name__ == "__main__":
                 
                 if gen == NGEN - 1:
                     save_checkpoint(pop, hof, gen, args, seed_pool,
-                                filepath=f"data/seed_checkpoints/checkpoint_{NGEN}.pkl")
+                                filepath=f"data/seed_checkpoints/checkpoint_gen_{NGEN}.pkl")
 
         except KeyboardInterrupt:
             print("\nInterrupted.")

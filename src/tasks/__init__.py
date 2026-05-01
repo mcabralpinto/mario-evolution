@@ -1,2 +1,3 @@
-from src.tasks.move_forward import MoveForwardTask
+from src.tasks.runner import RunnerTask
 from src.tasks.hunter import HunterTask
+from src.tasks.thief import ThiefTask

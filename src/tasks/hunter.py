@@ -18,18 +18,14 @@ class HunterTask(Task):
         self.steps = 0
 
         self.stall_progress_eps = 0.61
-        self.stall_penalty_step = -0.1
         
         self.obstacles = [-11, -10, 16, 20]
         self.enemy_types = [2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 13]
         
-        self.coin_reward = 2500
         self.kill_reward = 10000
+        self.kills = 0
         
         self.debug = False
-        self.beta = False
-        self.kills = 0
-        self.last_enemy_count = 0
         self.previous_vy = 0.0
         
     def reset(self):
@@ -38,7 +34,7 @@ class HunterTask(Task):
         self.total_reward = 0
         self.kills = 0
         self.steps = 0
-        self.last_enemy_count = 0
+        self.previous_vy = 0.0
     
     def detect_kills(self, current_obs, last_obs):
             if last_obs is None:
@@ -118,11 +114,12 @@ class HunterTask(Task):
 
     def compute_reward(self, current_obs, last_obs):
         self.steps += 1
+        self.detect_kills(current_obs, last_obs)
         mx, my = current_obs.mario_pos
-        last_mx, _ = last_obs.mario_pos if last_obs else (mx, my)  
-        
+        last_mx, _ = last_obs.mario_pos if last_obs else (mx, my)
+
         # MOVING REWARD
-        delta_x = int(mx - last_mx >= 0.61)
+        delta_x = int(mx - last_mx >= self.stall_progress_eps)
         
         # STUCK PENALTY
         stuck_penalty = 0.0
@@ -137,9 +134,6 @@ class HunterTask(Task):
         ):
             # if mario is stuck for 10 steps and there is an obstacle in front of him, penalize
             stuck_penalty = -10 * (self.no_progress_steps - 10)
-        
-        # KILL REWARD
-        kill_reward = self.detect_kills(current_obs, last_obs) * self.kill_reward
 
         # DEBUG PRINT
         if (self.steps % 5 == 0 and self.debug):     
@@ -147,4 +141,4 @@ class HunterTask(Task):
                 print(" ".join(f"{int(cell):>3}" for cell in row))
             print()
 
-        return delta_x + stuck_penalty + kill_reward
+        return delta_x + stuck_penalty

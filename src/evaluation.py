@@ -2,7 +2,7 @@ from src.marioai.experiment import Experiment
 from src.marioai.task import Task
 from multiprocessing import Pool
 from src.agents import MLPAgent, CodeAgent
-from src.tasks import MoveForwardTask, HunterTask
+from src.tasks import RunnerTask, HunterTask, ThiefTask
 import numpy as np
 import random
 from tqdm import tqdm
@@ -28,6 +28,11 @@ def set_total_generations(ngen):
     TOTAL_GENERATIONS = int(ngen)
 
 
+def set_task_class(cls):
+    global TASK_TO_SOLVE
+    TASK_TO_SOLVE = cls
+
+
 def evaluate_agent(agent, task: Task, seed_pool=None, base_difficulty=0):
     """
     Evaluates the agent on the task for each seed in seed_pool.
@@ -50,11 +55,16 @@ def evaluate_agent(agent, task: Task, seed_pool=None, base_difficulty=0):
             exp.doEpisodes(1)
             seed_reward += task.cum_reward
 
-            if task.status == 1:
+            if isinstance(task, RunnerTask) and task.status == 1:
+                # Add win reward for RunnerTask
                 seed_reward += WIN_REWARD
                 
             if isinstance(task, HunterTask):
-                # Add coin reward for HunterTask
+                # Add kill reward for HunterTask
+                seed_reward += task.kill_reward * task.kills
+                
+            if isinstance(task, ThiefTask):
+                # Add coin reward for ThiefTask
                 seed_reward += task.coin_reward * task.coins
 
         total_reward += seed_reward

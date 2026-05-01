@@ -1,10 +1,10 @@
 import src.marioai as marioai
 import src.agents as agents
-import src.tasks.move_forward as move_forward
+import src.tasks.runner as runner
 
 def main():
     agent = agents.RandomAgent()
-    task = move_forward.MoveForwardTask(visualization=True)
+    task = runner.RunnerTask(visualization=True)
     exp = marioai.Experiment(task, agent)
     
     exp.max_fps = -1

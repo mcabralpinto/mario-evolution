@@ -33,7 +33,7 @@ Here is how the new algorithm works, broken down by its main components:
 Instead of testing programs independently, the algorithm now maintains a Population (a group of programs) that "evolves" over several Generations.
 
 Initial Pop: We start with a random crowd of programs.
-Evaluation: Every agent is tested in Mario and given a fitness score (based on the MoveForward or Hunter tasks).
+Evaluation: Every agent is tested in Mario and given a fitness score (based on the Runner or Hunter tasks).
 The Best Survive: We use Selection (Tournament Selection) to pick the best-performing agents to become "parents" for the next generation.
 2. Crossover (Breeding) - gp.cxOnePoint
 This is how the algorithm "combines" successful ideas.
