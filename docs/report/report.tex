@@ -24,7 +24,7 @@
 \maketitle
 
 \begin{abstract}
-We evolve game controllers for Super Mario Bros using Genetic Programming, pursuing two successive objectives: completing levels and maximizing enemy kills and coins obtained. Each individual is a typed syntax tree that compiles to an executable Python function, so the search operates over the space of structured programs. We define a typed grammar giving agents access to a $22\times22$ grid of terrain and enemy data, and train through two goal stages: level completion and kill/coin maximization. Bloat is controlled through Double Tournament selection with parsimony pressure; generalization is promoted through a rotating seed pool that changes every 10 generations. \TODO{2 sentences: win rate achieved by the evolved agent, improvement over the random baseline.}
+We evolve game controllers for Super Mario Bros using Genetic Programming across three task variants: a Runner targeting level completion, a Hunter targeting enemy kills, and a Thief targeting coin collection. Each individual is a typed syntax tree that compiles to an executable Python function, so the search operates directly over the space of structured programs. We define a typed grammar giving agents access to a $22\times22$ grid of terrain and enemy data. Bloat is controlled through Double Tournament selection with parsimony pressure; generalization is promoted through a rotating seed pool that changes every 10 generations. \TODO{2 sentences: win rate achieved by the evolved agent, improvement over the random baseline.}
 \end{abstract}
 
 
@@ -38,7 +38,7 @@ In this work we use Genetic Programming (GP)~\cite{koza1992genetic} to evolve co
 
 The course provided a base GP repository implemented with DEAP~\cite{fortin2012deap}: a minimal random search over a small typed grammar with two senses (\texttt{on\_ground}, \texttt{can\_jump}), two actions (\texttt{RIGHT}, \texttt{JUMP}), and basic \texttt{IF}/\texttt{SEQ} program structure. During our work, we expanded the grammar to give agents better perception of terrain and enemies, designed the fitness function, and replaced the random search with a full evolutionary algorithm.
 
-Training follows two stages: a completion stage, where the goal is to reach the end of the level, and a hunter stage, where additional rewards are awarded for killing enemies. The fitness function went through several iterations; the choices behind the final version are described in Section~\ref{sec:fitness}.
+Three task variants were evaluated: a Runner task targeting level completion, a Hunter task rewarding enemy kills, and a Thief task rewarding coin collection. The fitness function went through several iterations; the choices behind the final version are described in Section~\ref{sec:fitness}.
 
 
 % % =============================================================================
@@ -91,7 +91,7 @@ Conditions combine two perception predicates with standard boolean connectives:
   \mid{}& \texttt{IsMarioOnGround} \mid \texttt{MayMarioJump}
 \end{align*}
 
-Both predicates access the $22\times22$ grid at offset $(\Delta x, \Delta y)$ relative to Mario's cell. Horizontal offsets $\Delta x \in \{0,1,2,3\}$ let the agent look ahead up to four cells; vertical offsets $\Delta y \in \{-3,\ldots,+3\}$ cover above and below. The rationale behind this is that giving it full grid visibility would lead an explosion of possible programs, while this small subset allows for sufficient behaviour exploration while allowing it to learn to react to close threats. Additionally, since the framework stores terrain and enemy data in the same grid, both predicates query the same array and differ only in the value range they compare against: enemy type codes ($2$--$13$) versus tile codes.
+Both predicates access the $22\times22$ grid at offset $(\Delta x, \Delta y)$ relative to Mario's cell. Horizontal offsets $\Delta x \in \{0,1,2,3\}$ let the agent look ahead up to four cells; vertical offsets $\Delta y \in \{-3,\ldots,+3\}$ cover above and below. The rationale behind this is that giving it full grid visibility would lead an explosion of possible programs, while this small subset allows for sufficient behavioral coverage while allowing it to learn to react to close threats. Additionally, since the framework stores terrain and enemy data in the same grid, both predicates query the same array and differ only in the value range they compare against: enemy type codes ($2$--$13$) versus tile codes.
 
 An earlier version of the grammar used precomputed boolean predicates computed outside the GP tree (\texttt{hole\_ahead}, \texttt{enemy\_ahead}, \texttt{wall\_ahead}). This simplified the search space but also reduced it: the agent could not, for example, distinguish between enemy types or check arbitrary offsets. Though experiments with this grammar offered interesting insights (discussed below), these changes were reverted in order to align with the project statement's scope.
 
@@ -104,9 +104,11 @@ Enemy kind terminals cover all sprite types: Goomba (standard and winged), Red a
 \subsection{Fitness Calculation}
 \label{sec:fitness}
 
-\subsubsection{Stage 1}
+Three task variants were implemented: Runner, Hunter, and Thief. All three use the same per-step reward function; the difference is the episode-level bonus each adds to target its secondary objective.
 
-The first fitness function uses a very simple pattern:
+\subsubsection{Common Reward}
+
+Every task uses the following per-step reward:
 
 \begin{equation}
 r_t = \Delta x_t + P_{\text{stuck}}(t)
@@ -114,50 +116,65 @@ r_t = \Delta x_t + P_{\text{stuck}}(t)
 \end{equation}
 
 \paragraph{Forward progress.}
-$\Delta x_t = \mathbf{1}[\,x_t - x_{t-1} \geq 0.61\,]$ awards one point when Mario advances at least $0.61$ world units in a step. The binary nature of the function ensures that Mario doesn't get rewarded for running fast for no substantial gain, walking or speeding is the same (walking is most of the times efficient because it allows for better reasoning and control). The threshold is used so that stationary oscillations near a wall do not accumulate a positive reward, as that would go against the next term of the function.
+$\Delta x_t = \mathbf{1}[\,x_t - x_{t-1} \geq 0.61\,]$ awards one point when Mario advances at least $0.61$ world units in a step. The binary form means walking and running at full speed score identically, since faster movement does not inherently produce better behavior given the grammar's limited action space. The threshold also prevents stationary oscillations near a wall from accumulating reward, which would work against the stuck penalty.
 
 \paragraph{Stuck penalty.}
-When Mario has made no forward progress for more than $10$ consecutive steps (in order to not penalize legitimate pauses) and a solid obstacle occupies the cell directly ahead, a growing penalty is applied:
+When Mario has made no forward progress for more than $10$ consecutive steps and a solid obstacle occupies the cell directly ahead, a growing penalty is applied:
 \begin{equation}
 P_{\text{stuck}}(t) = \begin{cases}
     -10\,(n_{\text{stuck}} - 10) & \text{if } n_{\text{stuck}} > 10 \text{ and obstacle ahead} \\
     0 & \text{otherwise}
 \end{cases}
 \end{equation}
-The condition additionally requires that no Piranha Flower is present in the column above Mario. This exclusion was added after discussing how the original penalty, which lacked it, could cause agents to rush into Piranha pipes rather than waiting for the enemy to retract.
+The 10-step grace period prevents the penalty from firing during legitimate pauses. The condition also requires that no Piranha Flower is present in the column above Mario, given that the original formulation without this check caused agents to rush into Piranha pipes instead of waiting for the enemy to retract.
 
 \paragraph{Airtime penalty.}
-A behavior that soon became apparent in high-fitness individuals was their tendency to jump constantly. We theorized that agents converged to this behaviour because, due to the simplicity of their grammar, it is very hard to reach a proper ruleset of when jumping is favorable. As such, when an individual stumbles into this strategy in the early generations, it offers a massive jump in fitness, causing it to flood the population, which attempts to optimize it until the end of the run. 
+A behavior that emerged early in training was a tendency to jump constantly. Given the grammar's limited expressive power, evolving a principled jump strategy is difficult; jumping on every possible frame clears a large fraction of obstacles and pits, which makes it a highly fit strategy in early generations. Once a population converges on it, there is no selection pressure toward a more targeted approach.
 
-In order to counteract this behavior, a penalty proportional to the total air time was initally attempted and iterated over several tests. However, these either failed to prevent the final agent from jumping, or made it impossible for agents to learn to make any progress. This strengthened our belief that, with the current grammar, agents were only given the space to understand that the air is usually safer than the ground (at least in the first three difficulties). It is further supported by the fact that we were able to evolve Marios that did not display this behavior but still jumped over enemies and holes before removing those complex perceptions from our grammar.
+To counteract this, we tested a penalty proportional to total airtime across several iterations. The results were binary: either the penalty was too weak to suppress the behavior, or strong enough to also prevent agents from learning to jump at all, blocking forward progress entirely. This pointed to the conclusion that the current grammar does not provide enough perceptual structure for agents to learn when jumping is warranted. Additionally, agents evolved before removing the initial complex perceptions from our grammar (e.g., \texttt{hole\_ahead}) did not exhibit constant jumping, which further supports this interpretation.
 
-\paragraph{Episode average.}
-For the experiments run for the results section, each individual is evaluated over a seed pool $\mathcal{S}$ of $5$ level seeds and $3$ consecutive difficulty levels starting at base difficulty 0. A win bonus ($W = 10{,}000$) is added when the level is cleared. Fitness is the mean reward across all $|\mathcal{S}| \times 3$ episodes:
-\begin{equation}
-F = \frac{1}{|\mathcal{S}|} \sum_{s \in \mathcal{S}} \sum_{d=d_{\text{base}}}^{d_{\text{base}}+2} \!\Bigl(\sum_t r_t + W \cdot \mathbf{1}[\text{win}_{s,d}] + L \cdot \mathbf{1}[\text{lose}_{s,d}]\Bigr)
-\label{eq:fitness}
-\end{equation}
+\subsubsection{Runner Task}
 
-\subsubsection{Stage 2}
-This stage adds a kill reward to the reward function:
+The Runner task targets level completion. Beyond the progress reward, a win bonus of $W = 10{,}000$ is added at the end of any episode in which Mario clears the level:
 
 \begin{equation}
-r_t = \Delta x_t + P_{\text{stuck}}(t) + R_{\text{kill}}(t)
-\label{eq:step_reward}
+B_{\text{runner}}(s,d) = W \cdot \mathbf{1}[\text{win}_{s,d}], \quad W = 10{,}000
 \end{equation}
 
-\paragraph{Kill reward.}
-\TODO{update value when tests are complete}
-Each confirmed kill contributes $10{,}000$ points:
+\subsubsection{Hunter Task}
+
+The Hunter task targets enemy kills. The episode bonus is proportional to the number of confirmed kills $\hat{K}_{s,d}$ accrued during the episode:
+
 \begin{equation}
-R_{\text{kill}}(t) = 10{,}000\,\hat{k}_t
+B_{\text{hunter}}(s,d) = K \cdot \hat{K}_{s,d}, \quad K = 10{,}000
 \end{equation}
-Kill detection compares the enemy list between consecutive frames, counting reductions in enemy count while handling the exceptions that occur with enemies from the first three difficulties: Koopa-to-Shell transitions (a Koopa count drop paired with a Shell count rise maintains the enemy list size, but is counted as a kill); enemies falling into pits (filtered by a $y$ position threshold); enemies scrolling off-screen as Mario advances (filtered by horizontal distance); and Piranha Flowers retracting into pipes (detects plausible retractions). A disappearing enemy is counted as a kill only if Mario's vertical velocity at that step is consistent with a stomp bounce, meaning a sign reversal or a deceleration pattern that matches rebounding off the top of an enemy.
+
+Kill detection compares the enemy list between consecutive frames, counting reductions in enemy count while handling the exceptions that occur with enemies from the first three difficulties: Koopa-to-Shell transitions (a Koopa count drop paired with a Shell count rise maintains the enemy list size, but is counted as a kill); enemies falling into pits (filtered by a $y$ position threshold); enemies scrolling off-screen as Mario advances (filtered by horizontal distance); and Piranha Flowers retracting into pipes (detected by tracking per-column disappearances). A disappearing enemy is counted as a kill only if Mario's vertical velocity at that step is consistent with a stomp bounce, meaning a sign reversal or deceleration pattern matching a rebound off the top of an enemy.
 
 This replaced an earlier heuristic that counted kills whenever the number of enemies within a small radius around Mario decreased between frames. That approach produced frequent false positives in crowded sections, inflating the reward signal and leading agents to stand still near enemy clusters rather than completing the level.
 
-\paragraph{Coin reward.}
-\TODO{write description when tests are complete}
+An earlier design combined kills and coin collection into a single secondary objective. Optimizing for both goals simultaneously, with the limited grammar available to agents, added the workload of testing different weight configurations, and early experiments resulted in suboptimal agent performances across both tasks. Therefore, we created the Thief agent, splitting kills and coins into separate tasks, allowing each population to specialize on one behavior.
+
+\subsubsection{Thief Task}
+
+The Thief task targets coin collection. Coin counts are read directly from the end-of-episode observation packet provided by the game framework, so no per-step detection is needed. The episode bonus is:
+
+\begin{equation}
+B_{\text{thief}}(s,d) = C \cdot \hat{N}_{s,d}, \quad C = 2{,}500
+\end{equation}
+
+where $\hat{N}_{s,d}$ is the total coins collected in the episode. The per-coin bonus ($2{,}500$) is set lower than the kill bonus ($10{,}000$) given that coins are more abundant than killable enemies in a typical level; a higher value would have dominated the forward-progress signal and incentivized agents to loop back and re-collect rather than advance.
+
+\subsubsection{Episode Fitness}
+
+Each individual is evaluated over a seed pool $\mathcal{S}$ of $5$ level seeds and $3$ consecutive difficulty levels starting at base difficulty $d_{\text{base}}$. Fitness is the mean total reward across all $|\mathcal{S}| \times 3$ episodes:
+
+\begin{equation}
+F = \frac{1}{|\mathcal{S}|} \sum_{s \in \mathcal{S}} \sum_{d=d_{\text{base}}}^{d_{\text{base}}+2} \!\Bigl(\sum_t r_t + B_{\text{task}}(s, d)\Bigr)
+\label{eq:fitness}
+\end{equation}
+
+where $B_{\text{task}}(s, d)$ is the task-specific episode bonus defined below.
 
 \subsection{Evolutionary Algorithm}
 \label{sec:ea}
@@ -199,7 +216,7 @@ The mutation rate decreases from $1.0$ to $0.4$ over training. Preliminary exper
 The single best individual across all generations, stored in a Hall of Fame, is copied directly into the next generation at each step. This ensures the best fitness found is never lost to a bad crossover or mutation.
 
 \paragraph{Parallelism.}
-The provided evaluation infrastructure distributes fitness evaluations across $10$ worker processes, each holding a persistent connection to its own simulator instance. We extended it to support multi-seed pools, per-generation difficulty scheduling, and lazy re-evaluation: given the simulation's deterministic nature, only individuals whose fitness was invalidated by a genetic operator need to be re-evaluated.
+The provided evaluation infrastructure distributes fitness evaluations across $5$ worker processes, each holding a persistent connection to its own simulator instance. We extended it to support multi-seed pools, per-generation difficulty scheduling, and lazy re-evaluation: given the simulation's deterministic nature, only individuals whose fitness was invalidated by a genetic operator need to be re-evaluated.
 
 
 % =============================================================================
@@ -221,20 +238,13 @@ Finally, we chose to run 300-generation runs to fully explore the potential of t
 
 \subsection{Comparative Baseline}
 
-We compare evolved champions against a random search baseline to isolate the contribution of the evolutionary process from the expressive power of the grammar. We run five independent training experiments, each with a different random seed. For each run, the champion is selected by re-evaluating all checkpoints as described above. The baseline for each run is a single program drawn uniformly at random from the same grammar using the matching seed, with no selection or recombination applied. Both agents are then evaluated on $5{,}000$ held-out level seeds across three difficulty levels ($15{,}000$ episodes per agent), and we report mean and standard deviation across the five runs.
+Evolved champions are compared against a random search baseline to separate the contribution of the evolutionary process from the expressive power of the grammar alone. We run five independent experiments per task variant, each with a different random seed. For each run, the champion is selected by re-evaluating all checkpoints on a shared held-out set, using win rate as the selection criterion for Runner, average kills for Hunter, and average coins for Thief. The baseline for each run is a single program drawn uniformly at random from the same grammar, with no selection or recombination applied. Both agents are then evaluated on $5{,}000$ held-out level seeds across three difficulty levels ($15{,}000$ episodes per agent per run), and we report mean and standard deviation across the five runs.
 
-As a further comparison, we replicated the full experiment with Mario initialised as
-\textit{big Mario} carrying a fire flower (hereafter \textit{Fire Mario}).
-The grammar was extended with a \texttt{fire} action, but all training and evaluation
-parameters---population size, generations, seed‑pool rotation, checkpoint selection,
-and held‑out set size---remained identical.
-Descriptive statistics for Fire Mario are presented together with the normal Mario
-results in Table~\ref{tab:results}. Formal significance testing was reserved for the
-primary (normal‑Mario) comparison.
+% As a further comparison, we replicated the full experiment with Mario initialized as \textit{big Mario} carrying a fire flower (hereafter \textit{Fire Mario}). The grammar was extended with a \texttt{fire} action, but all training and evaluation parameters (population size, generations, seed pool rotation, checkpoint selection, and held-out set size) remained identical. Descriptive statistics for Fire Mario are presented together with the normal Mario results in Table~\ref{tab:results}. Formal significance testing was reserved for the primary comparison.
 
 \subsection{Statistical Analysis}
 
-Since both the evolutionary process and the level generator are stochastic, a single run is insufficient to draw reliable conclusions~\cite{doe_lecture}. We run five independent training seeds and evaluate the resulting champions and their matched baselines on $5{,}000$ held-out level seeds across three difficulties, giving $15{,}000$ episodes per agent. We report mean and standard deviation across the five runs for three metrics:
+The evolutionary process and level generator are both stochastic, so a single run per task is not sufficient to draw reliable conclusions~\cite{doe_lecture}. Across the five independent runs per variant, we report mean and standard deviation for four metrics:
 \begin{itemize}
     \item \textbf{Completion rate}: percentage of episodes in which the level is cleared before death or timeout.
     \item \textbf{Max distance}: mean maximum $x$-position reached in episodes that did not result in a level clear.
@@ -242,7 +252,7 @@ Since both the evolutionary process and the level generator are stochastic, a si
     \item \textbf{Coins collected}: mean number of coins gathered per episode.
 \end{itemize}
 
-To quantify the reliability of the observed advantage of the evolved normal Mario agents over the random baseline, we conducted paired-sample \textit{t}-tests on completion rates, enemies killed, and coins collected. The results indicated that \TODO{insert whether differences were statistically significant and in which metrics}.
+To quantify the advantage over the random baseline, we conducted paired-sample $t$-tests on completion rates, enemies killed, and coins collected for each task variant. The results indicated that \TODO{insert whether differences were statistically significant and in which metrics}.
 
 
 % =============================================================================
@@ -254,7 +264,7 @@ To quantify the reliability of the observed advantage of the evolved normal Mari
 
 Figures~\ref{fig:normal_100}, \ref{fig:normal_200}, and~\ref{fig:fire_200} plot the win rate of the best individual (Hall of Fame) at each checkpoint, evaluated on 100 held-out level seeds across the three training difficulties, giving 300 episodes per data point.
 
-In Figure~\ref{fig:normal_100} (population 100, normal mode), at around generation 10 the win rate jumps from near zero to approximately 31\%, with difficulty-0 reaching 65\% in the same checkpoint. From that point the overall win rate stabilizes in the 38--40\% range for the remaining 290 generations, with difficulty-0 peaking near 73\% around generation 150. Performance degrades with difficulty: difficulty-1 settles at roughly 20--33\% and difficulty-2 at 9--18\%, reflecting the increasing obstacle density and enemy variety at higher settings. The gap between the difficulty-0 line and the overall line shows that the agent learned to clear open, low-obstacle levels reliably but struggled to generalize to adversarial layouts. Seed rotation events are visible as short-lived dips at multiples of 10 generations; each dip is followed by recovery within the next rotation period, confirming that the population's strategy is general enough to survive seed-pool changes rather than collapsing on each rotation.
+In Figure~\ref{fig:normal_100} (population 100, normal mode), at around generation 10 the win rate jumps from near zero to approximately 31\%, with difficulty-0 reaching 65\% in the same checkpoint. From that point the overall win rate stabilizes in the 38--40\% range for the remaining 290 generations, with difficulty-0 peaking near 73\% around generation 150. Performance degrades with difficulty: difficulty-1 settles at roughly 20--33\% and difficulty-2 at 9--18\%, reflecting the increasing obstacle density and enemy variety at higher settings. The gap between the difficulty-0 line and the overall line shows that the agent learned to clear open, low-obstacle levels reliably but struggled to generalize to adversarial layouts. Seed rotation events are visible as short-lived dips at multiples of 10 generations; each dip is followed by recovery within the next rotation period, confirming that the population's strategy is general enough to survive seed pool changes rather than collapsing on each rotation.
 
 Figure~\ref{fig:normal_200} (population 200, normal mode) shows the same qualitative trajectory with a 40-generation delay: the best agent's overall win rate remains near zero until generation 50, then converges rapidly to the same 38--40\% plateau. The delay is likely due to the larger initial population requiring more episodes before a first viable run-and-jump strategy emerges and propagates. Final performance is nearly identical to the 100-population run, which supports choosing the smaller configuration as the default: the same quality is reached at roughly half the computational cost.
 
@@ -283,19 +293,21 @@ Figure~\ref{fig:fire_200} (population 200, fire mode) shows markedly higher win 
 
 \subsection{Evolved Agent vs.\ Random Search Baseline}
 
-Table~\ref{tab:comparison} compares the champion agent against the random search baseline across $N = 5$ held-out seeds and 3 difficulty levels.
+Table~\ref{tab:comparison} compares evolved champions against the random search baseline across all three task variants, evaluated on $5{,}000$ held-out seeds $\times$ 3 difficulties ($15{,}000$ episodes per agent).
 
 \begin{table}[t]
-\caption{Evolved champion vs.\ random search baseline ($N = 5$ held-out seeds $\times$ 3 difficulties, mean $\pm$ std). \TODO{Fill in all values.}}
+\caption{Evolved champions vs.\ random search baseline across task variants ($5{,}000$ seeds $\times$ 3 difficulties, mean $\pm$ std across 5 runs). \TODO{Fill in all values.}}
 \label{tab:comparison}
 \centering
-\begin{tabular}{lccc}
+\begin{tabular}{lcccc}
 \toprule
-\textbf{Metric} & \textbf{Random Search (Avg $\pm$ Std)} & \textbf{Evolved Agent (Avg $\pm$ Std)} & \textbf{Improvement} \\
+\textbf{Metric} & \textbf{Random Baseline} & \textbf{Runner} & \textbf{Hunter} & \textbf{Thief} \\
+ & \textbf{(Avg $\pm$ Std)} & \textbf{(Avg $\pm$ Std)} & \textbf{(Avg $\pm$ Std)} & \textbf{(Avg $\pm$ Std)} \\
 \midrule
-Levels Cleared (\%) & \TODO{X} & \TODO{Y} & \TODO{+Z\%} \\
-Max Distance (px)   & \TODO{X} & \TODO{Y} & \TODO{+Z\%} \\
-Enemies Killed      & \TODO{X} & \TODO{Y} & \TODO{+Z\%} \\
+Levels Cleared (\%) & \TODO{X} & \TODO{Y} & \TODO{Y} & \TODO{Y} \\
+Max Distance (px)   & \TODO{X} & \TODO{Y} & \TODO{Y} & \TODO{Y} \\
+Enemies Killed      & ---      & ---      & \TODO{Y} & ---      \\
+Coins Collected     & ---      & ---      & ---      & \TODO{Y} \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -385,12 +397,13 @@ The agent's primary failure mode is the absence of spatial lookahead in the jump
 %%% ============================================================
 %%%
 %%%  BLOCKING (need data before writing):
-%%%  [ ] Abstract: 2 sentences with key results (win rate, improvement over random).
+%%%  [ ] Abstract: 2 sentences with key results (win rate / kills / coins, improvement over random).
 %%%  [x] Sec 5.1: convergence discussion written from the three plot images.
-%%%  [ ] Table 2: fill all cells (Levels Cleared %, Max Distance, Enemies Killed)
-%%%      for both Random Search and Evolved Agent. Run evaluate_best_agent.py and
-%%%      a comparable random baseline on 5 held-out seeds × 3 difficulties.
-%%%  [ ] Sec 5.2 comments: qualitative difference in behavior; significance given std.
+%%%  [ ] Table 2: fill all cells (Levels Cleared %, Max Distance, Enemies Killed, Coins Collected)
+%%%      for Random Baseline, Runner, Hunter, and Thief columns.
+%%%      Run evaluate_best_agent.py (5000 seeds × 3 difficulties) for each task variant
+%%%      and a comparable random baseline.
+%%%  [ ] Sec 5.2 comments: qualitative difference in behavior per task; significance given std.
 %%%  [x] Sec 5.3: best individual pasted and analyzed (gp_mario_best.py).
 %%%  [ ] Sec 6 (Conclusion): write after Table 2 is filled.
 %%%
@@ -400,13 +413,17 @@ The agent's primary failure mode is the absence of spatial lookahead in the jump
 %%%      start produced better generalization. Now in the text.
 %%%  [x] Seed rotation: 10 > 5 (too noisy) and 10 > 20 (overfitting). Now in text.
 %%%  [x] Mario mode: default 0 (small Mario) in all main experiments.
-%%%  [x] Champion evaluation: 3 difficulties × 5 held-out seeds. Confirmed.
-%%%  [x] Statistical evaluation: 5 held-out seeds (not 5 independent full runs).
+%%%  [x] Champion evaluation: 5000 seeds × 3 difficulties per agent. Confirmed.
+%%%  [x] Statistical evaluation: 5 independent full runs per task variant.
+%%%  [x] Hunter/Thief split: single combined secondary objective caused poor performance
+%%%      on both goals; separated into distinct tasks (Hunter=kills, Thief=coins).
+%%%  [x] Champion selection: Runner → max win rate; Hunter → max avg kills; Thief → max avg coins.
 %%%
 %%%  STILL OPEN:
 %%%  [ ] Fire-mode figure (Fig. 3) used 200-pop — treat as secondary / leave for
 %%%      later. If comparing pop sizes, do it in its own ablation entry; otherwise
 %%%      just present 100-pop as the main setting and note fire mode separately.
+%%%  [ ] Hunter/Thief convergence plots — analogous to Figs 1–3 for kills and coins.
 %%%
 %%%  POLISH (low priority, do last):
 %%%  [ ] Add axis labels to all 3 figures.
