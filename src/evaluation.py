@@ -9,7 +9,7 @@ from tqdm import tqdm
 import atexit
 
 # Variable that configures the number of parallel processes
-N_PROCESSES = 10
+N_PROCESSES = 5
 # Task Definition
 TASK_TO_SOLVE = HunterTask
 
