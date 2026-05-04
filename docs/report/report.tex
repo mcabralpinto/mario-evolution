@@ -3,6 +3,7 @@
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
 \usepackage{graphicx}
+\usepackage{float}
 \usepackage{amsmath}
 \usepackage{booktabs}
 \usepackage{xcolor}
@@ -205,18 +206,18 @@ Elitism & Top-1 (Hall of Fame) \\
 \end{table}
 
 \paragraph{Selection and bloat control.}
-We use Double Tournament selection~\cite{luke2006bloat}, which runs two nested tournaments: the outer selects based on fitness (with a size that grows from 2 to 7 over training), and the inner selects based on tree size with a fractional tournament of size $1.7$, preferring shorter programs when fitness is similar. This avoids adding a size term to the fitness function directly, which requires careful weighting and tends to penalize legitimately complex programs that need more nodes to express a useful behavior.
+We use Double Tournament selection~\cite{luke2006bloat}, which runs two nested tournaments: the outer selects based on fitness (with a size that grows from 2 to 7 over training), and the inner selects based on tree size with a fractional tournament of size $1.7$, preferring shorter programs when fitness is similar. This avoids adding a size term to the fitness function directly, which requires careful weighting.
 
 \paragraph{Crossover and mutation.}
 One-point crossover selects a random node in each parent and swaps the corresponding subtrees. If the resulting offspring exceeds height $10$, the operation is reverted and the parent is preserved. Uniform subtree mutation selects a random node and replaces its subtree with a freshly grown random subtree (depth 2 - 6), so the algorithm introduces genuinely new code fragments rather than only recombining existing material.
 
-The mutation rate decreases from $1.0$ to $0.4$ over training. Preliminary experiments with fixed rates struggled with keeping an appropriate balance between exploration and exploitation at different points in the experiment. The dynamic schedule addresses both: high mutation early for exploration, lower mutation late for exploitation. The rationale behind the fitness tournament size is the same: it grows linearly so that early generations explore broadly under low selection pressure and later generations converge under stronger pressure once the search has found promising regions.
+The mutation rate decreases from $1.0$ to $0.4$ over training. Preliminary experiments with fixed rates struggled with keeping an appropriate balance between exploration and exploitation at different points in the experiment. The dynamic schedule addresses this: high mutation early for exploration, lower mutation late for exploitation. The rationale behind the fitness tournament size is the same: it grows linearly so that early generations explore broadly under low selection pressure and later generations converge under stronger pressure once the search has found promising regions.
 
 \paragraph{Elitism.}
 The single best individual across all generations, stored in a Hall of Fame, is copied directly into the next generation at each step. This ensures the best fitness found is never lost to a bad crossover or mutation.
 
 \paragraph{Parallelism.}
-The provided evaluation infrastructure distributes fitness evaluations across $5$ worker processes, each holding a persistent connection to its own simulator instance. We extended it to support multi-seed pools, per-generation difficulty scheduling, and lazy re-evaluation: given the simulation's deterministic nature, only individuals whose fitness was invalidated by a genetic operator need to be re-evaluated.
+The provided evaluation infrastructure distributes fitness evaluations across $5$ worker processes, each holding a persistent connection to its own simulator instance. We extended it to support multi-seed pools, difficulty scheduling, and lazy re-evaluation: given the simulation's deterministic nature, only individuals whose fitness was invalidated need to be re-evaluated.
 
 
 % =============================================================================
@@ -228,13 +229,20 @@ The provided evaluation infrastructure distributes fitness evaluations across $5
 
 All individuals within a generation are evaluated on the same $5$ randomly drawn level seeds, so that fitness values are directly comparable within a generation. Using different seeds per individual, as we did in early experiments, introduced noise that made selection unreliable: an individual with higher fitness might simply have faced an easier level rather than exhibiting a better strategy, which led to the population stagnating on a few lucky seeds rather than improving.
 
-To prevent overfitting to specific levels, the seed pool is rotated every $10$ generations by drawing a fresh set from a universe of $1{,}000$ seeds. At each rotation, all population fitnesses are invalidated and re-evaluated under the new pool; the Hall of Fame champion's fitness is also reset, so its score always reflects the current pool rather than a comparison made against an earlier one. A checkpoint is saved at each rotation. At the end of training, all checkpoints are re-evaluated on a fixed set of $500$ held-out seeds across the three training difficulties ($1{,}500$ episodes per checkpoint). The Hall of Fame champion from the checkpoint with the highest overall win rate on this held-out set is selected as the final evolved agent. This re-evaluation step is necessary because the Hall of Fame score stored in each checkpoint reflects fitness under whichever seed pool was active during that rotation, making raw fitness values across checkpoints incomparable without a shared evaluation basis.
+To prevent overfitting to specific levels, the seed pool is rotated every $10$ generations by drawing a fresh set from a universe of $1{,}000$ seeds. At each rotation, all population fitnesses are invalidated and re-evaluated under the new pool, including the Hall of Fame champion (so its score always reflects the current pool). A checkpoint is saved at each rotation. At the end of training, all checkpoints are re-evaluated on a fixed set of $500$ held-out seeds across the three training difficulties. The Hall of Fame champion from the checkpoint with the highest overall win rate on this held-out set is selected as the final evolved agent. This re-evaluation step is necessary because the Hall of Fame score stored in each checkpoint reflects fitness under whichever seed pool was active during that rotation, making raw fitness values across checkpoints incomparable without a shared evaluation basis. This method also allows for the visualization of performance across generations, as seen in Figure \ref{fig:normal_100}.
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.82\textwidth]{images/winrate_vs_gen_normal_100.png}
+  \caption{Example champion win rate vs.\ generation plot for the Runner task. After reaching finding a capable strategy (running and jumping), it hovers around 30-40\% win-rate, attempting to optimize its strategy until the end of the training run. Completion rate per level closely follows the swings in the overall rate.}
+  \label{fig:normal_100}
+\end{figure}
 
 For seed pool rotation, periods of 5, 10, and 20 generations were compared, with the middle option achieving overall better results. Rotating every 5 generations did not give the population enough time to exploit each seed pool before it changed, slowing convergence. Rotating every 20 generations allowed the population to overfit to specific level seeds, with agents that scored well on the current pool but failed to generalize when the pool changed. Rotating every 10 generations provided a good balance: enough stability for selection to act meaningfully, and enough change to prevent overfitting.
 
 The base difficulty $d_{\text{base}}$ is fixed at $0$ throughout training, so agents are always evaluated on difficulties $0$, $1$, and $2$ simultaneously. An earlier design explored a curriculum that gradually shifted $d_{\text{base}}$ upward over generations. This was abandoned when training on all three difficulties from the start produced better-generalizing agents, likely because the easier difficulty levels provide a reliable learning signal even when the population is still immature.
 
-Finally, we chose to run 300-generation runs to fully explore the potential of the evolutionary approach, even though there were clear signs of stagnation after about 100 generations. 200-individual and 100-individual populations were compared, with the latter configuration producing comparable completion rates at half the wall-clock cost, and was adopted as the default.
+Finally, we chose to run 300-generation runs as a compromise between computational cost and exploration of the evolutionary approach. 200-individual and 100-individual populations were compared, with the latter configuration producing comparable completion rates at half the cost, and was adopted as the default.
 
 \subsection{Comparative Baseline}
 
@@ -244,15 +252,7 @@ Evolved champions are compared against a random search baseline to separate the 
 
 \subsection{Statistical Analysis}
 
-The evolutionary process and level generator are both stochastic, so a single run per task is not sufficient to draw reliable conclusions~\cite{doe_lecture}. Across the five independent runs per variant, we report mean and standard deviation for four metrics:
-\begin{itemize}
-    \item \textbf{Completion rate}: percentage of episodes in which the level is cleared before death or timeout.
-    \item \textbf{Max distance}: mean maximum $x$-position reached in episodes that did not result in a level clear.
-    \item \textbf{Enemies killed}: mean number of confirmed kills per episode.
-    \item \textbf{Coins collected}: mean number of coins gathered per episode.
-\end{itemize}
-
-To quantify the advantage over the random baseline, we conducted paired-sample $t$-tests on completion rates, enemies killed, and coins collected for each task variant. The results indicated that \TODO{insert whether differences were statistically significant and in which metrics}.
+The evolutionary process and level generator are both stochastic, so a single run per task is not sufficient to draw reliable conclusions~\cite{doe_lecture}. Across the five independent runs per variant, we report mean and standard deviation for completion rate, average distance in unbeaten levels, enemies killed, and coins collected: mean number of coins gathered per episode. To quantify the advantage over the random baseline, we conducted paired-sample $t$-tests on the relevant metrics for each task variant.
 
 
 % =============================================================================
@@ -260,42 +260,9 @@ To quantify the advantage over the random baseline, we conducted paired-sample $
 \label{sec:results}
 % =============================================================================
 
-\subsection{Fitness Convergence}
+Table~\ref{tab:comparison} compares evolved champions against the random search baseline across all three task variants, evaluated on $5{,}000$ held-out seeds $\times$ 3 difficulties:
 
-Figures~\ref{fig:normal_100}, \ref{fig:normal_200}, and~\ref{fig:fire_200} plot the win rate of the best individual (Hall of Fame) at each checkpoint, evaluated on 100 held-out level seeds across the three training difficulties, giving 300 episodes per data point.
-
-In Figure~\ref{fig:normal_100} (population 100, normal mode), at around generation 10 the win rate jumps from near zero to approximately 31\%, with difficulty-0 reaching 65\% in the same checkpoint. From that point the overall win rate stabilizes in the 38--40\% range for the remaining 290 generations, with difficulty-0 peaking near 73\% around generation 150. Performance degrades with difficulty: difficulty-1 settles at roughly 20--33\% and difficulty-2 at 9--18\%, reflecting the increasing obstacle density and enemy variety at higher settings. The gap between the difficulty-0 line and the overall line shows that the agent learned to clear open, low-obstacle levels reliably but struggled to generalize to adversarial layouts. Seed rotation events are visible as short-lived dips at multiples of 10 generations; each dip is followed by recovery within the next rotation period, confirming that the population's strategy is general enough to survive seed pool changes rather than collapsing on each rotation.
-
-Figure~\ref{fig:normal_200} (population 200, normal mode) shows the same qualitative trajectory with a 40-generation delay: the best agent's overall win rate remains near zero until generation 50, then converges rapidly to the same 38--40\% plateau. The delay is likely due to the larger initial population requiring more episodes before a first viable run-and-jump strategy emerges and propagates. Final performance is nearly identical to the 100-population run, which supports choosing the smaller configuration as the default: the same quality is reached at roughly half the computational cost.
-
-Figure~\ref{fig:fire_200} (population 200, fire mode) shows markedly higher win rates. Difficulty-0 reaches near 100\% from generation 55 onward, difficulty-1 stabilizes between 60--75\%, and difficulty-2 ranges from 34--60\%, giving an overall win rate of 65--70\%. Fire Mario eliminates most enemies with projectiles rather than stomps, which removes the need for precise vertical positioning during kills. Since the grammar and fitness function are identical, the improvement is entirely attributable to the task becoming easier to navigate, , showing the ceiling that normal-mode enemy encounters impose.
-
-\begin{figure}[t]
-  \centering
-  \includegraphics[width=0.82\textwidth]{images/winrate_vs_gen_normal_100.png}
-  \caption{Win rate vs.\ generation, population size 100, normal Mario mode.}
-  \label{fig:normal_100}
-\end{figure}
-
-\begin{figure}[t]
-  \centering
-  \includegraphics[width=0.82\textwidth]{images/winrate_vs_gen_normal_200.png}
-  \caption{Win rate vs.\ generation, population size 200, normal Mario mode.}
-  \label{fig:normal_200}
-\end{figure}
-
-\begin{figure}[t]
-  \centering
-  \includegraphics[width=0.82\textwidth]{images/winrate_vs_gen_fire_200.png}
-  \caption{Win rate vs.\ generation, population size 200, fire Mario mode.}
-  \label{fig:fire_200}
-\end{figure}
-
-\subsection{Evolved Agent vs.\ Random Search Baseline}
-
-Table~\ref{tab:comparison} compares evolved champions against the random search baseline across all three task variants, evaluated on $5{,}000$ held-out seeds $\times$ 3 difficulties ($15{,}000$ episodes per agent).
-
-\begin{table}[t]
+\begin{table}[H]
 \caption{Evolved champions vs.\ random search baseline across task variants ($5{,}000$ seeds $\times$ 3 difficulties, mean $\pm$ std across 5 runs). \TODO{Fill in all values.}}
 \label{tab:comparison}
 \centering
@@ -314,68 +281,68 @@ Coins Collected     & ---      & ---      & ---      & \TODO{Y} \\
 
 \TODO{Comment on the table. Describe the qualitative difference in behavior: the random agent will jump and move without a coordinated strategy, while the evolved agent should show consistent forward movement and at minimum a learned response to walls and pits. Discuss whether the improvement is meaningful given the observed standard deviations, or whether the variance is too large to draw firm conclusions.}
 
-\subsection{Qualitative Analysis of Evolved Behavior}
+% \subsection{Qualitative Analysis of Evolved Behavior}
 
-The best individual found in the 100-population normal-mode run (Hall of Fame score: 51114) is shown below.
+% The best individual found in the 100-population normal-mode run (Hall of Fame score: 51114) is shown below.
 
-\begin{small}
-\begin{verbatim}
-def corre(action, landscape, enemies, can_jump,
-          on_ground, mario_pos, Mario, Sprite, **kwargs):
+% \begin{small}
+% \begin{verbatim}
+% def corre(action, landscape, enemies, can_jump,
+%           on_ground, mario_pos, Mario, Sprite, **kwargs):
 
-    if (enemies[11+-1][11+1] < 8):
-        if (not (landscape[11+1][11+3] > 16)):
-            if (enemies[11+-1][11+1] < 12):
-                if (not (on_ground or on_ground)):
-                    action[Mario.KEY_RIGHT] = 1
-                else:
-                    action[Mario.KEY_SPEED] = 1
-        else:
-            action[Mario.KEY_SPEED] = 1
-    if ((not (on_ground or ((enemies[11+0][11+2] < 13)
-         and ((enemies[11+0][11+-3] == 13) or on_ground))))
-         or can_jump):
-        action[Mario.KEY_JUMP] = 1
-    else:
-        if (landscape[11+0][11+3] < 16):
-            if (not (enemies[11+-2][11+0] == 8)):
-                if can_jump:
-                    if (enemies[11+3][11+0] == 8):
-                        if can_jump:
-                            action[Mario.KEY_SPEED] = 0
-                        else:
-                            if on_ground:
-                                action[Mario.KEY_LEFT] = 1
-                    else:
-                        if (can_jump and on_ground):
-                            if on_ground:
-                                action[Mario.KEY_RIGHT] = 1
-                        else:
-                            if can_jump:
-                                action[Mario.KEY_LEFT] = 1
-                            else:
-                                action[Mario.KEY_RIGHT] = 1
-            else:
-                if can_jump:
-                    if (enemies[11+3][11+3] < 8):
-                        if can_jump:
-                            if can_jump:
-                                action[Mario.KEY_DOWN] = 0
-                            else:
-                                action[Mario.KEY_LEFT] = 0
-        else:
-            if can_jump:
-                action[Mario.KEY_JUMP] = 0
-\end{verbatim}
-\end{small}
+%     if (enemies[11+-1][11+1] < 8):
+%         if (not (landscape[11+1][11+3] > 16)):
+%             if (enemies[11+-1][11+1] < 12):
+%                 if (not (on_ground or on_ground)):
+%                     action[Mario.KEY_RIGHT] = 1
+%                 else:
+%                     action[Mario.KEY_SPEED] = 1
+%         else:
+%             action[Mario.KEY_SPEED] = 1
+%     if ((not (on_ground or ((enemies[11+0][11+2] < 13)
+%          and ((enemies[11+0][11+-3] == 13) or on_ground))))
+%          or can_jump):
+%         action[Mario.KEY_JUMP] = 1
+%     else:
+%         if (landscape[11+0][11+3] < 16):
+%             if (not (enemies[11+-2][11+0] == 8)):
+%                 if can_jump:
+%                     if (enemies[11+3][11+0] == 8):
+%                         if can_jump:
+%                             action[Mario.KEY_SPEED] = 0
+%                         else:
+%                             if on_ground:
+%                                 action[Mario.KEY_LEFT] = 1
+%                     else:
+%                         if (can_jump and on_ground):
+%                             if on_ground:
+%                                 action[Mario.KEY_RIGHT] = 1
+%                         else:
+%                             if can_jump:
+%                                 action[Mario.KEY_LEFT] = 1
+%                             else:
+%                                 action[Mario.KEY_RIGHT] = 1
+%             else:
+%                 if can_jump:
+%                     if (enemies[11+3][11+3] < 8):
+%                         if can_jump:
+%                             if can_jump:
+%                                 action[Mario.KEY_DOWN] = 0
+%                             else:
+%                                 action[Mario.KEY_LEFT] = 0
+%         else:
+%             if can_jump:
+%                 action[Mario.KEY_JUMP] = 0
+% \end{verbatim}
+% \end{small}
 
-The program consists of two sequential statements. The first block handles the speed decision: it checks for an enemy of type $< 8$ (Goomba or empty) one cell above and one cell ahead, and, if no tile with code $> 16$ (i.e., no enemy obstacle) blocks the path three columns ahead at ground level, sets \textsc{Speed}. This increases forward momentum whenever a low-threat enemy is nearby and the terrain ahead is passable.
+% The program consists of two sequential statements. The first block handles the speed decision: it checks for an enemy of type $< 8$ (Goomba or empty) one cell above and one cell ahead, and, if no tile with code $> 16$ (i.e., no enemy obstacle) blocks the path three columns ahead at ground level, sets \textsc{Speed}. This increases forward momentum whenever a low-threat enemy is nearby and the terrain ahead is passable.
 
-The second block encodes the dominant behavior. Its condition, \texttt{(not (on\_ground or \ldots)) or can\_jump}, simplifies to \texttt{can\_jump} on almost every ground-contact frame, meaning the agent jumps on every step it is able to. The result is a controller that runs right and jumps continuously, with the speed modulation in the first block providing the only enemy-sensitive adjustment.
+% The second block encodes the dominant behavior. Its condition, \texttt{(not (on\_ground or \ldots)) or can\_jump}, simplifies to \texttt{can\_jump} on almost every ground-contact frame, meaning the agent jumps on every step it is able to. The result is a controller that runs right and jumps continuously, with the speed modulation in the first block providing the only enemy-sensitive adjustment.
 
-The tree contains several introns. \texttt{on\_ground or on\_ground} evaluates identically to \texttt{on\_ground} but occupies two leaf nodes and one OR node. The else branch of the jump condition (lines 18--44) covers the brief window when Mario is grounded but \texttt{can\_jump} is false; since this window lasts only a few frames per landing, most of the nested conditions in that branch are rarely reached during a normal episode. Parsimony pressure kept the tree from growing further but did not eliminate these segments, since their size contribution was small enough to survive the parsimony tournament.
+% The tree contains several introns. \texttt{on\_ground or on\_ground} evaluates identically to \texttt{on\_ground} but occupies two leaf nodes and one OR node. The else branch of the jump condition (lines 18--44) covers the brief window when Mario is grounded but \texttt{can\_jump} is false; since this window lasts only a few frames per landing, most of the nested conditions in that branch are rarely reached during a normal episode. Parsimony pressure kept the tree from growing further but did not eliminate these segments, since their size contribution was small enough to survive the parsimony tournament.
 
-The agent's primary failure mode is the absence of spatial lookahead in the jump decision: the jump fires based on \texttt{can\_jump} alone, without checking whether a pit or an obstacle lies ahead. On higher-difficulty levels with more pits and denser enemy placement, this causes the agent to launch itself into gaps it could have avoided, which accounts for the sharp drop in win rate from difficulty~0 to difficulty~2.
+% The agent's primary failure mode is the absence of spatial lookahead in the jump decision: the jump fires based on \texttt{can\_jump} alone, without checking whether a pit or an obstacle lies ahead. On higher-difficulty levels with more pits and denser enemy placement, this causes the agent to launch itself into gaps it could have avoided, which accounts for the sharp drop in win rate from difficulty~0 to difficulty~2.
 
 
 % =============================================================================
@@ -434,3 +401,4 @@ The agent's primary failure mode is the absence of spatial lookahead in the jump
 
 % make it so that references appear in the order they are referenced
 % see if all references are truly necessary
+% mention fire mario as a note below actual results
