@@ -93,11 +93,13 @@ def main():
                         help="Training seed (used for output file naming).")
     parser.add_argument("--no-show", action="store_true",
                         help="Save chart without displaying it (non-blocking).")
+    parser.add_argument("--random", action="store_true",
+                        help="Label output files as 'random_seed_N' (for random-search runs).")
     args = parser.parse_args()
     if args.hunter and args.thief:
         parser.error("--hunter and --thief are mutually exclusive")
 
-    task_name = "hunter" if args.hunter else ("thief" if args.thief else "runner")
+    task_name = "random" if args.random else ("hunter" if args.hunter else ("thief" if args.thief else "runner"))
     if args.seed is not None:
         chart_path = Path("data/charts") / f"{task_name}_seed_{args.seed}.png"
         agent_out_path = Path("data/agents") / f"{task_name}_seed_{args.seed}.py"

@@ -24,7 +24,7 @@ class EvalResult(NamedTuple):
     conditional_win_rate_per_diff: dict  # {diff: win_rate} only for seeds that won all prior diffs
 
 SEED_START = 20000
-SEED_N = 2500
+SEED_N = 5000
 DISPLAY_SEED_N = 5
 DISPLAY_DIFFICULTIES = 3
 
