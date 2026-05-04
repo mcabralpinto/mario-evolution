@@ -24,7 +24,6 @@ class RunnerTask(Task):
         self.steps += 1
         mx, my = current_obs.mario_pos
         last_mx, _ = last_obs.mario_pos if last_obs else (mx, my)  
-        
         # MOVING REWARD
         delta_x = int(mx - last_mx >= self.stall_progress_eps)
         
