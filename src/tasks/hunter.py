@@ -1,5 +1,3 @@
-from numpy import rint
-
 from src.marioai.task import Task
 
 _KOOPA_TYPES = frozenset({4, 5, 6, 7})
@@ -119,7 +117,7 @@ class HunterTask(Task):
         last_mx, _ = last_obs.mario_pos if last_obs else (mx, my)
 
         # MOVING REWARD
-        delta_x = int(mx - last_mx >= self.stall_progress_eps)
+        delta_x = int(abs(mx - last_mx) >= self.stall_progress_eps)
         
         # STUCK PENALTY
         stuck_penalty = 0.0
@@ -127,18 +125,13 @@ class HunterTask(Task):
             self.no_progress_steps += 1
         else:
             self.no_progress_steps = 0
-        if (
-            self.no_progress_steps > 10 and 
-            current_obs.level_scene[11][12] in self.obstacles and
-            not any(current_obs.level_scene[i][j] == 12 for i in range(0, 12) for j in range(12, 14)) # piranha above
-        ):
+        if (self.no_progress_steps > 10):
             # if mario is stuck for 10 steps and there is an obstacle in front of him, penalize
             stuck_penalty = -10 * (self.no_progress_steps - 10)
-
         # DEBUG PRINT
         if (self.steps % 5 == 0 and self.debug):     
             for row in current_obs.level_scene:
                 print(" ".join(f"{int(cell):>3}" for cell in row))
             print()
 
-        return delta_x + stuck_penalty
+        return delta_x*0.1 + stuck_penalty
