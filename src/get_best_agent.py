@@ -91,6 +91,8 @@ def main():
                         help="Thief mode: select by avg_coins, plot coins.")
     parser.add_argument("--seed", type=int, default=None,
                         help="Training seed (used for output file naming).")
+    parser.add_argument("--no-show", action="store_true",
+                        help="Save chart without displaying it (non-blocking).")
     args = parser.parse_args()
     if args.hunter and args.thief:
         parser.error("--hunter and --thief are mutually exclusive")
@@ -162,7 +164,8 @@ def main():
         plt.tight_layout()
         plt.savefig(chart_path, dpi=150)
         print(f"\nPlot saved to {chart_path}")
-        plt.show()
+        if not args.no_show:
+            plt.show()
 
     elif args.thief:
         avg_coins_list = []
@@ -209,7 +212,8 @@ def main():
         plt.tight_layout()
         plt.savefig(chart_path, dpi=150)
         print(f"\nPlot saved to {chart_path}")
-        plt.show()
+        if not args.no_show:
+            plt.show()
 
     else:
         win_rates = []
@@ -251,7 +255,8 @@ def main():
         plt.tight_layout()
         plt.savefig(chart_path, dpi=150)
         print(f"\nPlot saved to {chart_path}")
-        plt.show()
+        if not args.no_show:
+            plt.show()
 
 
 if __name__ == "__main__":
