@@ -20,10 +20,11 @@ class EvalResult(NamedTuple):
     avg_progress: float        # mean Mario distance in episodes that weren't won
     avg_kills: float
     avg_coins: float
-    win_rate_per_diff: dict    # {diff: win_rate} for per-difficulty charts
+    win_rate_per_diff: dict              # {diff: win_rate} across all seeds
+    conditional_win_rate_per_diff: dict  # {diff: win_rate} only for seeds that won all prior diffs
 
 SEED_START = 20000
-SEED_N = 1000
+SEED_N = 5000
 DISPLAY_SEED_N = 5
 DISPLAY_DIFFICULTIES = 3
 
@@ -76,6 +77,7 @@ def evaluate_from_code(code_str, task_cls=None, seed_start=SEED_START, seed_n=SE
     n_episodes = 0
     wins_per_diff = {d: 0 for d in difficulties}
     counts_per_diff = {d: 0 for d in difficulties}
+    seed_wins = {s: {} for s in seeds}  # seed -> {diff: bool}
 
     for seed, diff in tqdm(episodes, desc=f"Evaluating ({task_cls.__name__})", unit="ep"):
         task.env.level_seed = seed
@@ -84,6 +86,7 @@ def evaluate_from_code(code_str, task_cls=None, seed_start=SEED_START, seed_n=SE
         exp.doEpisodes()
 
         won = task.status == 1
+        seed_wins[seed][diff] = won
         if won:
             total_wins += 1
             wins_per_diff[diff] += 1
@@ -101,7 +104,22 @@ def evaluate_from_code(code_str, task_cls=None, seed_start=SEED_START, seed_n=SE
     avg_coins = total_coins / n_episodes if n_episodes else 0.0
     win_rate_per_diff = {d: wins_per_diff[d] / counts_per_diff[d] if counts_per_diff[d] else 0.0
                          for d in difficulties}
-    return EvalResult(win_rate, avg_progress, avg_kills, avg_coins, win_rate_per_diff)
+
+    cond_wins = {d: 0 for d in difficulties}
+    cond_counts = {d: 0 for d in difficulties}
+    for s in seeds:
+        for d in difficulties:
+            if all(seed_wins[s].get(pd, False) for pd in range(d)):
+                cond_counts[d] += 1
+                if seed_wins[s].get(d, False):
+                    cond_wins[d] += 1
+    conditional_win_rate_per_diff = {
+        d: cond_wins[d] / cond_counts[d] if cond_counts[d] else 0.0
+        for d in difficulties
+    }
+
+    return EvalResult(win_rate, avg_progress, avg_kills, avg_coins,
+                      win_rate_per_diff, conditional_win_rate_per_diff)
 
 
 def evaluate_code_agent(suffix="", display=False, task_cls=None, seed_start=SEED_START, seed_n=SEED_N,

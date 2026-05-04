@@ -12,6 +12,8 @@ __pycache__
 
 data/checkpoints
 data/seed_checkpoints
+data/charts
+data/agents
 
 # latex auxiliary files
 *.aux
