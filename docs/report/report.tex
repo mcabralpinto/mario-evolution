@@ -269,9 +269,9 @@ Table~\ref{tab:comparison} compares evolved champions against the random search 
 \toprule
 \textbf{Metric} & \textbf{Random Baseline} & \textbf{Runner} & \textbf{Hunter} & \textbf{Thief} \\
 \midrule
-Levels Cleared (\%) & $0.26 \pm 0.45$ & \textbf{39.3 $\pm$ 0.2} & $32.2 \pm 0.6$ & $30.5 \pm 0.5$ \\
+Levels Cleared (\%) & $0.3 \pm 0.5$ & \textbf{39.3 $\pm$ 0.2} & $32.2 \pm 0.6$ & $30.5 \pm 0.5$ \\
 Max Distance (px)   & $458.9 \pm 53.4$ & \textbf{1005.3 $\pm$ 2.5} & $942.3 \pm 10.6$ & $928.9 \pm 17.8$ \\
-Enemies Killed      & $0.0 \pm 0.0$ & $0.63 \pm 0.06$  & \textbf{0.88 $\pm$ 0.04}  & $0.83 \pm 0.03$  \\
+Enemies Killed      & $0.07 \pm 0.16$ & $0.63 \pm 0.06$  & \textbf{0.88 $\pm$ 0.04}  & $0.83 \pm 0.03$  \\
 Coins Collected     & $1.03 \pm 1.79$ & $6.99 \pm 0.03$  & \textbf{9.69 $\pm$ 0.33}  & $9.02 \pm 1.00$  \\
 \bottomrule
 \end{tabular}
@@ -295,75 +295,72 @@ Coins Collected     & $1.03 \pm 1.79$ & $6.99 \pm 0.03$  & \textbf{9.69 $\pm$ 0.
 \end{table}
 \vspace{-0.5cm}
 
-All three evolved agents outperform the random baseline in all metrics, given that it struggles to complete any level and usually winds up dying early or getting stuck on a wall due to not learning to jump. Standard deviations are small for every task ($\pm0.2$\,pp for Runner, $\pm0.6$ for Hunter, $\pm0.5$ for Thief), indicating that each agent consistently leans toward a variation of the ``run-jump'' strategy that is better suited for its task. The fact that Runner has a considerably higher win rate than Hunter and Thief aligns with the expected behavior: while all incentivize forward progress, Runner is the one that directly rewards beating levels. However, Hunter and Thief don't fall behind too sharply: their secondary goals appear to serve as an effective proxy for winning levels (the further they reach in the level, the better their chances of achieving higher scores). 
+All three evolved agents outperform the random baseline in all metrics, given that it struggles to complete any level and usually winds up dying early or getting stuck on a wall due to not learning to jump. It also displays high standard deviations across all metrics, as it does not obtain a solidified strategy across individuals, unlike the other tasked agents, which consistently leans toward the variation of the ``run-jump'' strategy that is better suited for its task. The fact that Runner has a considerably higher win rate than Hunter and Thief aligns with the expected behavior: while all incentivize forward progress, Runner is the one that directly rewards beating levels. However, Hunter and Thief don't fall behind too sharply: their secondary goals appear to serve as an effective proxy for winning levels (the further they reach in the level, the better their chances of achieving higher scores). 
 
-For kills and coins, Hunter and Thief outperform Runner in both metrics. We theorize that, due to individuals of the former two tasks tendentially being slower (not using the \texttt{SPEED} control), they cover more space and have more opportunities to interact with enemies and coins. Between them, Hunter appears to be the most effective at utilizing this strategy, even collecting more coins than Thief. This may also be explained by the fact that there is no mapping for coins in the perceptiongrid, essentially meaning it is much harder to optimize for this goal. % t-test
+For kills and coins, Hunter and Thief outperform Runner in both metrics. We theorize that, due to individuals of the former two tasks tendentially being slower (using the \textsc{Speed} control less), they cover more space and have more opportunities to interact with enemies and coins (thus also dying more frequently to enemy non-kills and pits). Between the two, Hunter is the most effective at utilizing this strategy, even collecting more coins than Thief. This may also be explained by the fact that there is no mapping for coins in the perception grid, essentially meaning it is much harder to optimize for this goal. 
 
 Table~\ref{tab:winrate_diff} shows a consistent difficulty spike across all tasks: win rates fall from around $65\%$ at $d=0$ to $25\%$ at $d=1$ and $12\%$ at $d=2$. In most cases, the conditional rate exceeds the non-conditional rate, meaning that beating a medium-difficulty level is predictive of beating a hard one. However, for Runner, the conditional rate at $d=2$ is $14.6\%$ against a non-conditional $16.3\%$, a result that is statistically significant (p < 0.05). This may indicate that the additional challenges introduced by $d=2$ compared to $d=1$ may require a slightly different skill set to beat, and that beating $d=1$ is not a reliable predictor of beating $d=2$ when using this strategy.
 
-
-To isolate the task‑relevant gains, we compare Runner vs.\ Random on levels cleared,
-Hunter vs.\ Runner on enemies killed, and Hunter vs.\ Thief on coins collected.
-Table~\ref{tab:pairwise} reports the mean difference \(\Delta\), the 95\% confidence
-interval for \(\Delta\), Cohen's \(d\), and the outcome of a two‑tailed Welch's
-\(t\)-test based on \(n = 5\) independent runs per agent.
-
+\vspace{-0.5cm}
 \begin{table}[htbp]
 \centering
-\caption{Pairwise comparisons of key metrics across evolved agents.}
+\caption{Pairwise comparisons of key metrics across evolved agents. Covers mean difference \(\Delta\), 95\% confidence interval for \(\Delta\), Cohen's \(d\), and result of a two-tailed Welch's \(t\)-test \(n = 5\)}
 \label{tab:pairwise}
+\resizebox{\textwidth}{!}{%
 \begin{tabular}{|l|c|c|c|c|c|c|}
 \hline
 \textbf{Comparison} & \(\Delta\) & \textbf{CI} & \textbf{Cohen's \(d\)} & \textbf{\(t\)} & \textbf{df} & \textbf{\(p\)} \\
 \hline
 Runner vs.\ Random (levels cleared, \%) & 39.04 & [38.5, 39.6] & 112.1 & 177.3  & 5.5 & \(<0.0001\) \\
 \hline
-Hunter vs.\ Runner (enemies killed)    & 0.25 & [0.17, 0.33] & 4.90  & 7.75 & 7.0 & \(<0.0001\) \\
+Hunter vs.\ Runner (enemies killed)    & 0.25 & [0.19, 0.31] & 4.90  & 7.75 & 7.0 & \(<0.0001\) \\
+\hline
+Hunter vs.\ Thief (enemies killed)    & 0.05 & [0.01, 0.09] & 0.42 & 2.24 & 1.41 & 0.028 \\
 \hline
 Hunter vs.\ Thief (coins collected)    & 0.67 & [-0.54, 1.88] & 0.90  & 1.42 & 4.9 & 0.23 \\
 \hline
 \end{tabular}
+}
 \end{table}
+\vspace{-0.5cm}
 
-The first two comparisons confirm statistically significant and extremely large
-advantages. For coins, the 95\% confidence interval spans zero and the \(p\)-value
-of \(0.23\) means we cannot reject the null hypothesis at \(\alpha = 0.05\); the
-difference would be declared significant only at a significance level
-\(\alpha > 0.23\). Thus, the apparent coin advantage of the Hunter over the Thief
-is not statistically reliable with the current number of runs.
+In Table~\ref{tab:pairwise} we make several pairwise comparisons between task types to isolate task-specific gains. The first two comparisons confirm extremely large advantages. The last two show that while Hunter's advantage over Thief on killed enemies is statistically significant, the advantage on coins is not.
 
-\subsection{Qualitative Analysis of Evolved Behavior}
+% \subsection{Qualitative Analysis of Evolved Behavior}
 
-The random baseline produces no wins because stochastic action sequences cannot maintain the forward movement needed to clear a level: the agent will occasionally press right or jump, but without any coordinated structure these actions are quickly stopped by an obstacle or enemy, leaving Mario stuck.
+% The random baseline produces no wins because stochastic action sequences cannot maintain the forward movement needed to clear a level: the agent will occasionally press right or jump, but without any coordinated structure these actions are quickly stopped by an obstacle or enemy, leaving Mario stuck.
 
-The best Runner individual found is a compact controller:
+% The best Runner individual found is a compact controller:
 
-\begin{small}
-\begin{verbatim}
-action[KEY_RIGHT] = 1
-if (can_jump or (on_ground or can_jump)):
-    if can_jump:
-        action[KEY_JUMP] = 1
-    else:
-        action[KEY_RIGHT] = 0
-else:
-    action[KEY_JUMP] = 1
-if (enemies[11+-3][11+-1] <= 3) and (landscape[11+-3][11+2] != -10):
-    action[KEY_SPEED] = 1
-\end{verbatim}
-\end{small}
+% \begin{small}
+% \begin{verbatim}
+% action[KEY_RIGHT] = 1
+% if (can_jump or (on_ground or can_jump)):
+%     if can_jump:
+%         action[KEY_JUMP] = 1
+%     else:
+%         action[KEY_RIGHT] = 0
+% else:
+%     action[KEY_JUMP] = 1
+% if (enemies[11+-3][11+-1] <= 3) and (landscape[11+-3][11+2] != -10):
+%     action[KEY_SPEED] = 1
+% \end{verbatim}
+% \end{small}
 
-The first statement sets \textsc{Right} unconditionally. The jump condition \texttt{can\_jump or (on\_ground or can\_jump)} simplifies to \texttt{can\_jump or on\_ground}, which holds on almost every ground-level frame, so the agent jumps on every step it is able to and briefly releases \textsc{Right} on landing frames. The speed condition checks for a low-threat sprite ($\leq 3$, Goomba variants) three cells behind Mario with no hard obstacle at the same offset; since the offset points behind Mario, this branch fires on largely empty terrain and amounts to a near-unconditional speed boost. The result is an agent that runs right and jumps on every available frame, clearing most obstacles and pits without any explicit lookahead.
+% The first statement sets \textsc{Right} unconditionally. The jump condition \texttt{can\_jump or (on\_ground or can\_jump)} simplifies to \texttt{can\_jump or on\_ground}, which holds on almost every ground-level frame, so the agent jumps on every step it is able to and briefly releases \textsc{Right} on landing frames. The speed condition checks for a low-threat sprite ($\leq 3$, Goomba variants) three cells behind Mario with no hard obstacle at the same offset; since the offset points behind Mario, this branch fires on largely empty terrain and amounts to a near-unconditional speed boost. The result is an agent that runs right and jumps on every available frame, clearing most obstacles and pits without any explicit lookahead.
 
-The failure mode follows from the same design: the jump fires on \texttt{can\_jump} alone, without checking whether a pit lies ahead. On higher difficulties, where pits are more frequent and enemies more dense, the agent frequently launches itself into gaps it could have avoided, which accounts for the sharp drop in win rate from $d=0$ to $d=2$.
+% The failure mode follows from the same design: the jump fires on \texttt{can\_jump} alone, without checking whether a pit lies ahead. On higher difficulties, where pits are more frequent and enemies more dense, the agent frequently launches itself into gaps it could have avoided, which accounts for the sharp drop in win rate from $d=0$ to $d=2$.
 
-The Hunter and Thief champions are larger programs that retain the same run-right core but add conditional blocks that activate \textsc{Speed} or \textsc{Jump} based on enemy type codes and terrain values at specific offsets. In the Thief champion, an unconditional \texttt{KEY\_LEFT = 1} statement fires on every ground-contact frame, producing occasional left-stepping on landings; this is a structural intron that parsimony pressure did not remove, since its node cost fell below the tournament threshold. Neither program encodes an explicit kill or coin-seeking path: the secondary objective scores come from the forward progress these agents make through levels where enemies and coins happen to lie on the route.
+% The Hunter and Thief champions are larger programs that retain the same run-right core but add conditional blocks that activate \textsc{Speed} or \textsc{Jump} based on enemy type codes and terrain values at specific offsets. In the Thief champion, an unconditional \texttt{KEY\_LEFT = 1} statement fires on every ground-contact frame, producing occasional left-stepping on landings; this is a structural intron that parsimony pressure did not remove, since its node cost fell below the tournament threshold. Neither program encodes an explicit kill or coin-seeking path: the secondary objective scores come from the forward progress these agents make through levels where enemies and coins happen to lie on the route.
+
 % =============================================================================
 \section{Conclusion}
 \label{sec:conclusion}
 % =============================================================================
 
-\TODO{Write after results are confirmed. Structure: (1) one paragraph restating the approach and the two objectives. (2) The most impactful design choices, with results woven in, e.g., ``Switching to the type-aware kill detector raised confirmed kills per episode from X to Y; the radius heuristic had attributed those same kills to off-screen scrolling.'' (3) Limitations: fixed-arity grammar with no loops or arithmetic, evaluation cost constraining population size, sensitivity to kill-reward weighting relative to the progress signal. (4) Future directions: extending the grammar with loops and numeric comparisons, island models to maintain diversity across subpopulations, and adaptive operator tuning via CMA-ES.}
+GP over a typed grammar produced controllers that clear levels at 39.3\% across $5{,}000$ held-out seeds, against 0.3\% for random search. Hunter and Thief agents reached 32.2\% and 30.5\% respectively; Hunter led on kills ($0.88$ vs.\ $0.63$ for Runner) and incidentally on coins, though the coin advantage over Thief is not statistically reliable ($p = 0.23$). All three converge on ``run-jump'' variants, with the secondary objective shaping which variant is preferred. The biggest gains came from a small number of decisions: splitting the combined secondary objective into separate tasks, switching to a type-aware kill detector that eliminated false positives from the radius heuristic, and rotating the seed pool every 10 generations to prevent level overfitting without disrupting selection.
+
+The grammar's fixed arity and absence of arithmetic or loops is the main structural limitation: the airtime penalty experiment showed agents cannot evolve a conditional jump policy without richer perceptual primitives. 
 
 
 \bibliographystyle{splncs04}
