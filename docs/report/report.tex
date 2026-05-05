@@ -25,7 +25,7 @@
 \maketitle
 
 \begin{abstract}
-We evolve game controllers for Super Mario Bros using Genetic Programming across three task variants: a Runner targeting level completion, a Hunter targeting enemy kills, and a Thief targeting coin collection. Each individual is a typed syntax tree that compiles to an executable Python function, so the search operates directly over the space of structured programs. We define a typed grammar giving agents access to a $22\times22$ grid of terrain and enemy data. Bloat is controlled through Double Tournament selection with parsimony pressure; generalization is promoted through a rotating seed pool that changes every 10 generations. \TODO{2 sentences: win rate achieved by the evolved agent, improvement over the random baseline.}
+We evolve game controllers for Super Mario Bros using Genetic Programming across three task variants: a Runner targeting level completion, a Hunter targeting enemy kills, and a Thief targeting coin collection. Each individual is a typed syntax tree that compiles to an executable Python function, so the search operates directly over the space of structured programs. Bloat is controlled through Double Tournament selection with parsimony pressure; generalization is promoted through a rotating seed pool that changes every 10 generations. Runner agents achieve the highest win rate, while both Hunter and Thief agents notably improve on kill/coin collection. The Random baseline fails to create capable agents.
 \end{abstract}
 
 
@@ -92,7 +92,7 @@ Conditions combine two perception predicates with standard boolean connectives:
   \mid{}& \texttt{IsMarioOnGround} \mid \texttt{MayMarioJump}
 \end{align*}
 
-Both predicates access the $22\times22$ grid at offset $(\Delta x, \Delta y)$ relative to Mario's cell. Horizontal offsets $\Delta x \in \{0,1,2,3\}$ let the agent look ahead up to four cells; vertical offsets $\Delta y \in \{-3,\ldots,+3\}$ cover above and below. The rationale behind this is that giving it full grid visibility would lead an explosion of possible programs, while this small subset allows for sufficient behavioral coverage while allowing it to learn to react to close threats. Additionally, since the framework stores terrain and enemy data in the same grid, both predicates query the same array and differ only in the value range they compare against: enemy type codes ($2$--$13$) versus tile codes.
+Both predicates access the $22\times22$ grid at offset $(\Delta x, \Delta y)$ relative to Mario's cell. Horizontal offsets $\Delta x \in \{0,1,2,3\}$ let the agent look ahead up to four cells; vertical offsets $\Delta y \in \{-3,\ldots,+3\}$ cover above and below. The rationale behind this is that giving it full grid visibility would lead an explosion of possible programs, while this small subset allows for sufficient behavioral coverage while allowing it to learn to react to close threats. Additionally, since the framework stores terrain and enemy data in the same grid, both predicates query the same array and differ only in the value range they compare against: enemy type codes (2 - 13) versus tile codes.
 
 An earlier version of the grammar used precomputed boolean predicates computed outside the GP tree (\texttt{hole\_ahead}, \texttt{enemy\_ahead}, \texttt{wall\_ahead}). This simplified the search space but also reduced it: the agent could not, for example, distinguish between enemy types or check arbitrary offsets. Though experiments with this grammar offered interesting insights (discussed below), these changes were reverted in order to align with the project statement's scope.
 
@@ -211,10 +211,10 @@ We use Double Tournament selection~\cite{luke2006bloat}, which runs two nested t
 \paragraph{Crossover and mutation.}
 One-point crossover selects a random node in each parent and swaps the corresponding subtrees. If the resulting offspring exceeds height $10$, the operation is reverted and the parent is preserved. Uniform subtree mutation selects a random node and replaces its subtree with a freshly grown random subtree (depth 2 - 6), so the algorithm introduces genuinely new code fragments rather than only recombining existing material.
 
-The mutation rate decreases from $1.0$ to $0.4$ over training. Preliminary experiments with fixed rates struggled with keeping an appropriate balance between exploration and exploitation at different points in the experiment. The dynamic schedule addresses this: high mutation early for exploration, lower mutation late for exploitation. The rationale behind the fitness tournament size is the same: it grows linearly so that early generations explore broadly under low selection pressure and later generations converge under stronger pressure once the search has found promising regions.
+The mutation rate decreases from $1.0$ to $0.4$ over training. Preliminary experiments with fixed rates struggled with keeping an appropriate balance between exploration and exploitation at different points in the experiment. The dynamic schedule addresses this: high mutation early for exploration, lower mutation late for exploitation. The rationale behind the fitness tournament size is the same: it grows so that early generations explore under low selection pressure and later generations converge once the search has found promising regions.
 
 \paragraph{Elitism.}
-The single best individual across all generations, stored in a Hall of Fame, is copied directly into the next generation at each step. This ensures the best fitness found is never lost to a bad crossover or mutation.
+The single best individual across all generations, stored in a Hall of Fame (HoF), is copied directly into the next generation at each step. This ensures the best fitness found is never lost to a bad crossover or mutation.
 
 \paragraph{Parallelism.}
 The provided evaluation infrastructure distributes fitness evaluations across $5$ worker processes, each holding a persistent connection to its own simulator instance. We extended it to support multi-seed pools, difficulty scheduling, and lazy re-evaluation: given the simulation's deterministic nature, only individuals whose fitness was invalidated need to be re-evaluated.
@@ -229,30 +229,28 @@ The provided evaluation infrastructure distributes fitness evaluations across $5
 
 All individuals within a generation are evaluated on the same $5$ randomly drawn level seeds, so that fitness values are directly comparable within a generation. Using different seeds per individual, as we did in early experiments, introduced noise that made selection unreliable: an individual with higher fitness might simply have faced an easier level rather than exhibiting a better strategy, which led to the population stagnating on a few lucky seeds rather than improving.
 
-To prevent overfitting to specific levels, the seed pool is rotated every $10$ generations by drawing a fresh set from a universe of $1{,}000$ seeds. At each rotation, all population fitnesses are invalidated and re-evaluated under the new pool, including the Hall of Fame champion (so its score always reflects the current pool). A checkpoint is saved at each rotation. At the end of training, all checkpoints are re-evaluated on a fixed set of $500$ held-out seeds across the three training difficulties. The Hall of Fame champion from the checkpoint with the highest overall win rate on this held-out set is selected as the final evolved agent. This re-evaluation step is necessary because the Hall of Fame score stored in each checkpoint reflects fitness under whichever seed pool was active during that rotation, making raw fitness values across checkpoints incomparable without a shared evaluation basis. This method also allows for the visualization of performance across generations, as seen in Figure \ref{fig:normal_100}.
+To prevent overfitting to specific levels, the seed pool is rotated every $10$ generations by drawing a fresh set from a universe of $1{,}000$ seeds. At each rotation, all population fitnesses are invalidated and re-evaluated under the new pool, including the HoF champion (so its score always reflects the current pool). A checkpoint is saved at each rotation. At the end of training, all checkpoints are re-evaluated on a fixed set of $500$ held-out seeds across the three training difficulties. The HoF champion from the checkpoint with the highest overall win rate on this held-out set is selected as the final evolved agent. This step is necessary because the HoF score stored in each checkpoint reflects fitness under whichever seed pool was active during that rotation, making raw fitness values across checkpoints incomparable without a shared evaluation basis. This method also allows for the visualization of performance across generations, as seen in Figure \ref{fig:normal_100}.
 
+\vspace{-0.5cm}
 \begin{figure}[h]
   \centering
   \includegraphics[width=0.82\textwidth]{images/winrate_vs_gen_normal_100.png}
-  \caption{Example champion win rate vs.\ generation plot for the Runner task. After reaching finding a capable strategy (running and jumping), it hovers around 30-40\% win-rate, attempting to optimize its strategy until the end of the training run. Completion rate per level closely follows the swings in the overall rate.}
+  \caption{Example champion win rate vs.\ generation plot for the Runner task. After reaching finding a capable strategy (running and jumping), it hovers around 30-40\% win rate, attempting to optimize its strategy until the end of the training run. Completion rate per level closely follows the swings in the overall rate.}
   \label{fig:normal_100}
 \end{figure}
+\vspace{-0.5cm}
 
 For seed pool rotation, periods of 5, 10, and 20 generations were compared, with the middle option achieving overall better results. Rotating every 5 generations did not give the population enough time to exploit each seed pool before it changed, slowing convergence. Rotating every 20 generations allowed the population to overfit to specific level seeds, with agents that scored well on the current pool but failed to generalize when the pool changed. Rotating every 10 generations provided a good balance: enough stability for selection to act meaningfully, and enough change to prevent overfitting.
 
 The base difficulty $d_{\text{base}}$ is fixed at $0$ throughout training, so agents are always evaluated on difficulties $0$, $1$, and $2$ simultaneously. An earlier design explored a curriculum that gradually shifted $d_{\text{base}}$ upward over generations. This was abandoned when training on all three difficulties from the start produced better-generalizing agents, likely because the easier difficulty levels provide a reliable learning signal even when the population is still immature.
 
-Finally, we chose to run 300-generation runs as a compromise between computational cost and exploration of the evolutionary approach. 200-individual and 100-individual populations were compared, with the latter configuration producing comparable completion rates at half the cost, and was adopted as the default.
+Finally, we chose to run 300-generation runs as a compromise between computational cost and exploration of the evolutionary approach. 200 and 100-individual populations were compared, with the latter configuration producing comparable completion rates at half the cost, and was adopted as the default.
 
-\subsection{Comparative Baseline}
+\subsection{Comparative Baseline \& Statistical Analysis}
 
-Evolved champions are compared against a random search baseline to separate the contribution of the evolutionary process from the expressive power of the grammar alone. We run five independent experiments per task variant, each with a different random seed. For each run, the champion is selected by re-evaluating all checkpoints on a shared held-out set, using win rate as the selection criterion for Runner, average kills for Hunter, and average coins for Thief. The baseline for each run is a single program drawn uniformly at random from the same grammar, with no selection or recombination applied. Both agents are then evaluated on $5{,}000$ held-out level seeds across three difficulty levels ($15{,}000$ episodes per agent per run), and we report mean and standard deviation across the five runs.
+Evolved champions are compared against a random search baseline to separate the contribution of the evolutionary process from the expressive power of the grammar alone. We run five independent experiments per task variant, each with a different random seed. For each run, the champion is selected from checkpoints using the procedure described above, with win rate as the selection criterion for Runner, average kills for Hunter, and average coins for Thief. The baseline for each run is a Champion obtained by evaluating HoF agents from checkpoints of 100 random individuals and choosing the best-performing one. Both agents are then evaluated on $5{,}000$ held-out level seeds across three difficulty levels.
 
-% As a further comparison, we replicated the full experiment with Mario initialized as \textit{big Mario} carrying a fire flower (hereafter \textit{Fire Mario}). The grammar was extended with a \texttt{fire} action, but all training and evaluation parameters (population size, generations, seed pool rotation, checkpoint selection, and held-out set size) remained identical. Descriptive statistics for Fire Mario are presented together with the normal Mario results in Table~\ref{tab:results}. Formal significance testing was reserved for the primary comparison.
-
-\subsection{Statistical Analysis}
-
-The evolutionary process and level generator are both stochastic, so a single run per task is not sufficient to draw reliable conclusions~\cite{doe_lecture}. Across the five independent runs per variant, we report mean and standard deviation for completion rate, average distance in unbeaten levels, enemies killed, and coins collected: mean number of coins gathered per episode. To quantify the advantage over the random baseline, we conducted paired-sample $t$-tests on the relevant metrics for each task variant.
+The evolutionary process and level generator are both stochastic, so a single run per task is not sufficient to draw reliable conclusions. Across the five independent runs per variant, we report mean and standard deviation for completion rate, average distance in unbeaten levels, enemies killed, and coins collected. 
 
 
 % =============================================================================
@@ -260,91 +258,75 @@ The evolutionary process and level generator are both stochastic, so a single ru
 \label{sec:results}
 % =============================================================================
 
-Table~\ref{tab:comparison} compares evolved champions against the random search baseline across all three task variants, evaluated on $5{,}000$ held-out seeds $\times$ 3 difficulties:
+Table~\ref{tab:comparison} compares evolved champions against the random search baseline across all three task variants, evaluated on $5{,}000$ held-out seeds $\times$ 3 difficulties. Table~\ref{tab:winrate_diff} breaks down win rate by difficulty, showing non-conditional (NC) and conditional (C) rates side by side.
 
+\vspace{-0.5cm}
 \begin{table}[H]
-\caption{Evolved champions vs.\ random search baseline across task variants ($5{,}000$ seeds $\times$ 3 difficulties, mean $\pm$ std across 5 runs). \TODO{Fill in all values.}}
+\caption{Evolved champions vs.\ random search baseline across task variants ($5{,}000$ seeds $\times$ 3 difficulties, mean $\pm$ std across runs).}
 \label{tab:comparison}
 \centering
 \begin{tabular}{lcccc}
 \toprule
 \textbf{Metric} & \textbf{Random Baseline} & \textbf{Runner} & \textbf{Hunter} & \textbf{Thief} \\
- & \textbf{(Avg $\pm$ Std)} & \textbf{(Avg $\pm$ Std)} & \textbf{(Avg $\pm$ Std)} & \textbf{(Avg $\pm$ Std)} \\
 \midrule
-Levels Cleared (\%) & \TODO{X} & \TODO{Y} & \TODO{Y} & \TODO{Y} \\
-Max Distance (px)   & \TODO{X} & \TODO{Y} & \TODO{Y} & \TODO{Y} \\
-Enemies Killed      & ---      & ---      & \TODO{Y} & ---      \\
-Coins Collected     & ---      & ---      & ---      & \TODO{Y} \\
+Levels Cleared (\%) & $0.0 \pm 0.1$ & \textbf{39.3 $\pm$ 0.2} & $32.2 \pm 0.6$ & $30.5 \pm 0.5$ \\
+Max Distance (px)   & $428 \pm 34.3$ & \textbf{1005.3 $\pm$ 2.5} & $942.3 \pm 10.6$ & $928.9 \pm 17.8$ \\
+Enemies Killed      & $0.0 \pm 0.0$ & $0.63 \pm 0.06$  & \textbf{0.88 $\pm$ 0.04}  & $0.83 \pm 0.03$  \\
+Coins Collected     & $0.0 \pm 0.0$ & $6.99 \pm 0.03$  & \textbf{9.69 $\pm$ 0.33}  & $9.02 \pm 1.00$  \\
 \bottomrule
 \end{tabular}
 \end{table}
+\vspace{-0.5cm}
 
-\TODO{Comment on the table. Describe the qualitative difference in behavior: the random agent will jump and move without a coordinated strategy, while the evolved agent should show consistent forward movement and at minimum a learned response to walls and pits. Discuss whether the improvement is meaningful given the observed standard deviations, or whether the variance is too large to draw firm conclusions.}
+\vspace{-0.5cm}
+\begin{table}[H]
+\caption{Win rate (\%) per difficulty level (mean $\pm$ std across runs), shown as NC\,/\,C (non-conditional / conditional). The conditional rate at $d > 0$ is computed over the subset of episodes in which the agent also won at difficulty $d - 1$.}
+\label{tab:winrate_diff}
+\centering
+\begin{tabular}{lccc}
+\toprule
+\textbf{Diff.} & \textbf{Runner (NC\,/\,C)} & \textbf{Hunter (NC\,/\,C)} & \textbf{Thief (NC\,/\,C)} \\
+\midrule
+($d=0$) & \textbf{69.9 $\pm$ 0.9} & $64.0 \pm 0.2$ & $62.5 \pm 1.2$ \\
+($d=1$) & ~\textbf{31.8 $\pm$ 0.1} / \textbf{33.0 $\pm$ 0.4}~ & ~$23.0 \pm 1.2$~ / ~$23.9 \pm 1.4$~ & ~$20.6 \pm 0.7$ / $21.8 \pm 1.4$ \\
+($d=2$) & \textbf{16.3 $\pm$ 1.5} / \textbf{14.6 $\pm$ 1.0} & $9.5 \pm 1.4$  / $12.4 \pm 2.2$ & $8.3 \pm 0.3$  / $8.9 \pm 2.4$  \\
+\bottomrule
+\end{tabular}
+\end{table}
+\vspace{-0.5cm}
 
-% \subsection{Qualitative Analysis of Evolved Behavior}
+All three evolved agents outperform the random baseline in all metrics, given that it struggles to complete any level and usually winds up dying early or getting stuck on a wall due to not learning to jump. Standard deviations are small for every task ($\pm0.2$\,pp for Runner, $\pm0.6$ for Hunter, $\pm0.5$ for Thief), indicating that each agent consistently leans toward a variation of the ``run-jump'' strategy that is better suited for its task. The fact that Runner has a considerably higher win rate than Hunter and Thief aligns with the expected behavior: while all incentivize forward progress, Runner is the one that directly rewards beating levels. However, Hunter and Thief don't fall behind too sharply: their secondary goals appear to serve as an effective proxy for winning levels (the further they reach in the level, the better their chances of achieving higher scores). 
 
-% The best individual found in the 100-population normal-mode run (Hall of Fame score: 51114) is shown below.
+For kills and coins, Hunter and Thief outperform Runner in both metrics. We theorize that, due to individuals of the former two tasks tendentially being slower (not using the \texttt{SPEED} control), they cover more space and have more opportunities to interact with enemies and coins. Between them, Hunter appears to be the most effective at utilizing this strategy, even collecting more coins than Thief. This may also be explained by the fact that there is no mapping for coins in the perceptiongrid, essentially meaning it is much harder to optimize for this goal. % t-test
 
-% \begin{small}
-% \begin{verbatim}
-% def corre(action, landscape, enemies, can_jump,
-%           on_ground, mario_pos, Mario, Sprite, **kwargs):
+Table~\ref{tab:winrate_diff} shows a consistent difficulty spike across all tasks: win rates fall from around $65\%$ at $d=0$ to $25\%$ at $d=1$ and $12\%$ at $d=2$. In most cases, the conditional rate exceeds the non-conditional rate, meaning that beating a medium-difficulty level is predictive of beating a hard one. However, for Runner, the conditional rate at $d=2$ is $14.6\%$ against a non-conditional $16.3\%$, a result that is statistically significant (p < 0.05). This may indicate that the additional challenges introduced by $d=2$ compared to $d=1$ may require a slightly different skill set to beat, and that beating $d=1$ is not a reliable predictor of beating $d=2$ when using this strategy.
 
-%     if (enemies[11+-1][11+1] < 8):
-%         if (not (landscape[11+1][11+3] > 16)):
-%             if (enemies[11+-1][11+1] < 12):
-%                 if (not (on_ground or on_ground)):
-%                     action[Mario.KEY_RIGHT] = 1
-%                 else:
-%                     action[Mario.KEY_SPEED] = 1
-%         else:
-%             action[Mario.KEY_SPEED] = 1
-%     if ((not (on_ground or ((enemies[11+0][11+2] < 13)
-%          and ((enemies[11+0][11+-3] == 13) or on_ground))))
-%          or can_jump):
-%         action[Mario.KEY_JUMP] = 1
-%     else:
-%         if (landscape[11+0][11+3] < 16):
-%             if (not (enemies[11+-2][11+0] == 8)):
-%                 if can_jump:
-%                     if (enemies[11+3][11+0] == 8):
-%                         if can_jump:
-%                             action[Mario.KEY_SPEED] = 0
-%                         else:
-%                             if on_ground:
-%                                 action[Mario.KEY_LEFT] = 1
-%                     else:
-%                         if (can_jump and on_ground):
-%                             if on_ground:
-%                                 action[Mario.KEY_RIGHT] = 1
-%                         else:
-%                             if can_jump:
-%                                 action[Mario.KEY_LEFT] = 1
-%                             else:
-%                                 action[Mario.KEY_RIGHT] = 1
-%             else:
-%                 if can_jump:
-%                     if (enemies[11+3][11+3] < 8):
-%                         if can_jump:
-%                             if can_jump:
-%                                 action[Mario.KEY_DOWN] = 0
-%                             else:
-%                                 action[Mario.KEY_LEFT] = 0
-%         else:
-%             if can_jump:
-%                 action[Mario.KEY_JUMP] = 0
-% \end{verbatim}
-% \end{small}
+\subsection{Qualitative Analysis of Evolved Behavior}
 
-% The program consists of two sequential statements. The first block handles the speed decision: it checks for an enemy of type $< 8$ (Goomba or empty) one cell above and one cell ahead, and, if no tile with code $> 16$ (i.e., no enemy obstacle) blocks the path three columns ahead at ground level, sets \textsc{Speed}. This increases forward momentum whenever a low-threat enemy is nearby and the terrain ahead is passable.
+The random baseline produces no wins because stochastic action sequences cannot maintain the forward movement needed to clear a level: the agent will occasionally press right or jump, but without any coordinated structure these actions are quickly stopped by an obstacle or enemy, leaving Mario stuck.
 
-% The second block encodes the dominant behavior. Its condition, \texttt{(not (on\_ground or \ldots)) or can\_jump}, simplifies to \texttt{can\_jump} on almost every ground-contact frame, meaning the agent jumps on every step it is able to. The result is a controller that runs right and jumps continuously, with the speed modulation in the first block providing the only enemy-sensitive adjustment.
+The best Runner individual found is a compact controller:
 
-% The tree contains several introns. \texttt{on\_ground or on\_ground} evaluates identically to \texttt{on\_ground} but occupies two leaf nodes and one OR node. The else branch of the jump condition (lines 18--44) covers the brief window when Mario is grounded but \texttt{can\_jump} is false; since this window lasts only a few frames per landing, most of the nested conditions in that branch are rarely reached during a normal episode. Parsimony pressure kept the tree from growing further but did not eliminate these segments, since their size contribution was small enough to survive the parsimony tournament.
+\begin{small}
+\begin{verbatim}
+action[KEY_RIGHT] = 1
+if (can_jump or (on_ground or can_jump)):
+    if can_jump:
+        action[KEY_JUMP] = 1
+    else:
+        action[KEY_RIGHT] = 0
+else:
+    action[KEY_JUMP] = 1
+if (enemies[11+-3][11+-1] <= 3) and (landscape[11+-3][11+2] != -10):
+    action[KEY_SPEED] = 1
+\end{verbatim}
+\end{small}
 
-% The agent's primary failure mode is the absence of spatial lookahead in the jump decision: the jump fires based on \texttt{can\_jump} alone, without checking whether a pit or an obstacle lies ahead. On higher-difficulty levels with more pits and denser enemy placement, this causes the agent to launch itself into gaps it could have avoided, which accounts for the sharp drop in win rate from difficulty~0 to difficulty~2.
+The first statement sets \textsc{Right} unconditionally. The jump condition \texttt{can\_jump or (on\_ground or can\_jump)} simplifies to \texttt{can\_jump or on\_ground}, which holds on almost every ground-level frame, so the agent jumps on every step it is able to and briefly releases \textsc{Right} on landing frames. The speed condition checks for a low-threat sprite ($\leq 3$, Goomba variants) three cells behind Mario with no hard obstacle at the same offset; since the offset points behind Mario, this branch fires on largely empty terrain and amounts to a near-unconditional speed boost. The result is an agent that runs right and jumps on every available frame, clearing most obstacles and pits without any explicit lookahead.
 
+The failure mode follows from the same design: the jump fires on \texttt{can\_jump} alone, without checking whether a pit lies ahead. On higher difficulties, where pits are more frequent and enemies more dense, the agent frequently launches itself into gaps it could have avoided, which accounts for the sharp drop in win rate from $d=0$ to $d=2$.
 
+The Hunter and Thief champions are larger programs that retain the same run-right core but add conditional blocks that activate \textsc{Speed} or \textsc{Jump} based on enemy type codes and terrain values at specific offsets. In the Thief champion, an unconditional \texttt{KEY\_LEFT = 1} statement fires on every ground-contact frame, producing occasional left-stepping on landings; this is a structural intron that parsimony pressure did not remove, since its node cost fell below the tournament threshold. Neither program encodes an explicit kill or coin-seeking path: the secondary objective scores come from the forward progress these agents make through levels where enemies and coins happen to lie on the route.
 % =============================================================================
 \section{Conclusion}
 \label{sec:conclusion}
@@ -402,3 +384,4 @@ Coins Collected     & ---      & ---      & ---      & \TODO{Y} \\
 % make it so that references appear in the order they are referenced
 % see if all references are truly necessary
 % mention fire mario as a note below actual results
+% mencionar como fazemos com os random
