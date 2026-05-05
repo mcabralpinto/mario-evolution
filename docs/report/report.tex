@@ -269,10 +269,10 @@ Table~\ref{tab:comparison} compares evolved champions against the random search 
 \toprule
 \textbf{Metric} & \textbf{Random Baseline} & \textbf{Runner} & \textbf{Hunter} & \textbf{Thief} \\
 \midrule
-Levels Cleared (\%) & $0.0 \pm 0.1$ & \textbf{39.3 $\pm$ 0.2} & $32.2 \pm 0.6$ & $30.5 \pm 0.5$ \\
-Max Distance (px)   & $428 \pm 34.3$ & \textbf{1005.3 $\pm$ 2.5} & $942.3 \pm 10.6$ & $928.9 \pm 17.8$ \\
+Levels Cleared (\%) & $0.26 \pm 0.45$ & \textbf{39.3 $\pm$ 0.2} & $32.2 \pm 0.6$ & $30.5 \pm 0.5$ \\
+Max Distance (px)   & $458.9 \pm 53.4$ & \textbf{1005.3 $\pm$ 2.5} & $942.3 \pm 10.6$ & $928.9 \pm 17.8$ \\
 Enemies Killed      & $0.0 \pm 0.0$ & $0.63 \pm 0.06$  & \textbf{0.88 $\pm$ 0.04}  & $0.83 \pm 0.03$  \\
-Coins Collected     & $0.0 \pm 0.0$ & $6.99 \pm 0.03$  & \textbf{9.69 $\pm$ 0.33}  & $9.02 \pm 1.00$  \\
+Coins Collected     & $1.03 \pm 1.79$ & $6.99 \pm 0.03$  & \textbf{9.69 $\pm$ 0.33}  & $9.02 \pm 1.00$  \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -300,6 +300,37 @@ All three evolved agents outperform the random baseline in all metrics, given th
 For kills and coins, Hunter and Thief outperform Runner in both metrics. We theorize that, due to individuals of the former two tasks tendentially being slower (not using the \texttt{SPEED} control), they cover more space and have more opportunities to interact with enemies and coins. Between them, Hunter appears to be the most effective at utilizing this strategy, even collecting more coins than Thief. This may also be explained by the fact that there is no mapping for coins in the perceptiongrid, essentially meaning it is much harder to optimize for this goal. % t-test
 
 Table~\ref{tab:winrate_diff} shows a consistent difficulty spike across all tasks: win rates fall from around $65\%$ at $d=0$ to $25\%$ at $d=1$ and $12\%$ at $d=2$. In most cases, the conditional rate exceeds the non-conditional rate, meaning that beating a medium-difficulty level is predictive of beating a hard one. However, for Runner, the conditional rate at $d=2$ is $14.6\%$ against a non-conditional $16.3\%$, a result that is statistically significant (p < 0.05). This may indicate that the additional challenges introduced by $d=2$ compared to $d=1$ may require a slightly different skill set to beat, and that beating $d=1$ is not a reliable predictor of beating $d=2$ when using this strategy.
+
+
+To isolate the task‑relevant gains, we compare Runner vs.\ Random on levels cleared,
+Hunter vs.\ Runner on enemies killed, and Hunter vs.\ Thief on coins collected.
+Table~\ref{tab:pairwise} reports the mean difference \(\Delta\), the 95\% confidence
+interval for \(\Delta\), Cohen's \(d\), and the outcome of a two‑tailed Welch's
+\(t\)-test based on \(n = 5\) independent runs per agent.
+
+\begin{table}[htbp]
+\centering
+\caption{Pairwise comparisons of key metrics across evolved agents.}
+\label{tab:pairwise}
+\begin{tabular}{|l|c|c|c|c|c|c|}
+\hline
+\textbf{Comparison} & \(\Delta\) & \textbf{CI} & \textbf{Cohen's \(d\)} & \textbf{\(t\)} & \textbf{df} & \textbf{\(p\)} \\
+\hline
+Runner vs.\ Random (levels cleared, \%) & 39.04 & [38.5, 39.6] & 112.1 & 177.3  & 5.5 & \(<0.0001\) \\
+\hline
+Hunter vs.\ Runner (enemies killed)    & 0.25 & [0.17, 0.33] & 4.90  & 7.75 & 7.0 & \(<0.0001\) \\
+\hline
+Hunter vs.\ Thief (coins collected)    & 0.67 & [-0.54, 1.88] & 0.90  & 1.42 & 4.9 & 0.23 \\
+\hline
+\end{tabular}
+\end{table}
+
+The first two comparisons confirm statistically significant and extremely large
+advantages. For coins, the 95\% confidence interval spans zero and the \(p\)-value
+of \(0.23\) means we cannot reject the null hypothesis at \(\alpha = 0.05\); the
+difference would be declared significant only at a significance level
+\(\alpha > 0.23\). Thus, the apparent coin advantage of the Hunter over the Thief
+is not statistically reliable with the current number of runs.
 
 \subsection{Qualitative Analysis of Evolved Behavior}
 
