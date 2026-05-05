@@ -406,9 +406,10 @@ if __name__ == "__main__":
     parser.add_argument("--max_height", type=int, default=10)
     parser.add_argument(
         "--mode",
-        choices=["evolution", "random"],
+        choices=["evolution", "random", "random-checkpoint"],
         default="evolution",
-        help="Search mode for GP.",
+        help="Search mode for GP. 'random-checkpoint' generates a fresh random population "
+             "only at each checkpoint generation (seed_rotation multiples) and evaluates it.",
     )
     parser.add_argument(
         "--checkpoint",
@@ -531,6 +532,48 @@ if __name__ == "__main__":
         finally:
             terminate_evaluation_pool()
             save_checkpoint(pop, hof, gen, args, seed_pool)
+
+    elif args.mode == "random-checkpoint":
+        checkpoint_gens = list(range(args.seed_rotation, NGEN, args.seed_rotation))
+        if not checkpoint_gens or checkpoint_gens[-1] != NGEN:
+            checkpoint_gens.append(NGEN)
+
+        print(f"Starting Random-Checkpoint Search: {len(checkpoint_gens)} checkpoint(s) "
+              f"at gens {checkpoint_gens}, Population size {args.pop}")
+
+        hof = tools.HallOfFame(1)
+        gen = -1
+        try:
+            for gen in checkpoint_gens:
+                print(f"\n--- Checkpoint Generation {gen} ---")
+
+                pop = toolbox.population(n=args.pop)
+                seed_pool = random.sample(range(1, SEED_UNIVERSE + 1), args.seed_pool_size)
+                print(f"Seed pool: {seed_pool}")
+
+                base_difficulty = int((gen / max(NGEN - 1, 1)) * args.difficulty_shift)
+
+                compiled_pop = [compile_individual(ind) for ind in pop]
+                fitnesses = evaluate_population(CodeAgent, compiled_pop, generation=gen,
+                                               seed_pool=seed_pool, base_difficulty=base_difficulty)
+                for ind, fit in zip(pop, fitnesses):
+                    ind.fitness.values = (fit,)
+
+                hof.update(pop)
+                record = stats.compile(pop)
+                print(f"\033[91mMax:\033[0m {record['max']:.3f}, \033[94mMin:\033[0m {record['min']:.3f}, "
+                      f"\033[92mAvg:\033[0m {record['avg']:.3f}, \033[93mStd:\033[0m {record['std']:.3f}")
+
+                Path("data/seed_checkpoints").mkdir(parents=True, exist_ok=True)
+                save_checkpoint(pop, hof, gen, args, seed_pool,
+                                filepath=f"data/seed_checkpoints/checkpoint_gen_{gen}.pkl")
+
+        except KeyboardInterrupt:
+            print("\nInterrupted.")
+        finally:
+            terminate_evaluation_pool()
+            if gen >= 0:
+                save_checkpoint(pop, hof, gen, args, seed_pool)
 
     else:
         print(f"Starting Evolution: {NGEN} generations, Population size {args.pop}")
