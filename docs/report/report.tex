@@ -171,6 +171,7 @@ Table~\ref{tab:params} lists the final parameter configuration.
 
 \begin{table}[htbp]
 \caption{Evolutionary algorithm parameters used in the main experiments.}
+\vspace{-0.2cm}
 \label{tab:params}
 \centering
 \begin{tabular}{ll}
@@ -218,14 +219,15 @@ All individuals within a generation are evaluated on the same $5$ randomly drawn
 
 To prevent overfitting to specific levels, the seed pool is rotated every $10$ generations by drawing a fresh set from a universe of $1{,}000$ seeds. At each rotation, all population fitnesses are invalidated and re-evaluated under the new pool, including the HoF champion (so its score always reflects the current pool). A checkpoint is saved at each rotation. At the end of training, all checkpoints are re-evaluated on a fixed set of $500$ held-out seeds across the three training difficulties. The HoF champion from the checkpoint with the highest overall win rate on this held-out set is selected as the final evolved agent. This step is necessary because the HoF score stored in each checkpoint reflects fitness under whichever seed pool was active during that rotation, making raw fitness values across checkpoints incomparable without a shared evaluation basis. This method also allows for the visualization of performance across generations, as seen in Figure \ref{fig:normal_100}.
 
-\vspace{-0.7cm}
+\vspace{-0.5cm}
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=0.82\textwidth]{images/winrate_vs_gen_normal_100.png}
+  \vspace{-0.3cm}
   \caption{Example champion win rate vs.\ generation plot for the Runner task. After reaching finding a capable strategy (running and jumping), it hovers around 30-40\% win rate, attempting to optimize its strategy until the end of the training run. Completion rate per level closely follows the swings in the overall rate.}
   \label{fig:normal_100}
 \end{figure}
-\vspace{-0.7cm}
+\vspace{-0.5cm}
 
 For seed pool rotation, periods of 5, 10, and 20 generations were compared, with the middle option achieving overall better results. Rotating every 5 generations did not give the population enough time to exploit each seed pool before it changed, slowing convergence. Rotating every 20 generations allowed the population to overfit to specific level seeds, with agents that scored well on the current pool but failed to generalize when the pool changed. Rotating every 10 generations provided a good balance: enough stability for selection to act meaningfully, and enough change to prevent overfitting.
 
@@ -243,11 +245,12 @@ Evolved champions are compared against a random-search baseline to isolate the e
 \label{sec:results}
 % =============================================================================
 
-Table~\ref{tab:comparison} compares evolved champions against the random search baseline across all three task variants, evaluated on $5{,}000$ held-out seeds $\times$ 3 difficulties. Table~\ref{tab:winrate_diff} breaks down win rate by difficulty, showing non-conditional (NC) and conditional (C) rates side by side.
+Table~\ref{tab:comparison} compares evolved champions against the random search baseline across all three task variants, evaluated on $5{,}000$ held-out seeds $\times$ 3 difficulties. Table~\ref{tab:winrate_diff} displays win rate by difficulty, showing non-conditional and conditional rates.
 
-\vspace{-0.7cm}
+\vspace{-0.4cm}
 \begin{table}[htbp]
 \caption{Evolved champions vs.\ random search baseline across task variants ($5{,}000$ seeds $\times$ 3 difficulties, mean $\pm$ std across runs).}
+\vspace{-0.2cm}
 \label{tab:comparison}
 \centering
 \begin{tabular}{lcccc}
@@ -261,10 +264,10 @@ Coins Collected     & $1.03 \pm 1.79$ & $6.99 \pm 0.03$  & \textbf{9.69 $\pm$ 0.
 \bottomrule
 \end{tabular}
 \end{table}
-\vspace{-0.7cm}
-\vspace{-0.4cm}
+\vspace{-0.8cm}
 \begin{table}[htbp]
 \caption{Win rate (\%) per difficulty level (mean $\pm$ std across runs), shown as NC\,/\,C (non-conditional / conditional). The conditional rate at $d > 0$ is computed over the subset of episodes in which the agent also won at difficulty $d - 1$.}
+\vspace{-0.2cm}
 \label{tab:winrate_diff}
 \centering
 \begin{tabular}{lccc}
@@ -277,14 +280,21 @@ Coins Collected     & $1.03 \pm 1.79$ & $6.99 \pm 0.03$  & \textbf{9.69 $\pm$ 0.
 \bottomrule
 \end{tabular}
 \end{table}
-\vspace{-0.7cm}
-All three evolved agents outperform the random baseline in all metrics, given that it struggles to complete any level and usually winds up dying early or getting stuck on a wall due to not learning to jump. It also displays high standard deviations across all metrics, as it does not obtain a solidified strategy across individuals, unlike the other tasked agents, which consistently leans toward the variation of the ``run-jump'' strategy that is better suited for its task. The fact that Runner has a considerably higher win rate than Hunter and Thief aligns with the expected behavior: while all incentivize forward progress, Runner is the one that directly rewards beating levels. However, Hunter and Thief don't fall behind too sharply: their secondary goals appear to serve as an effective proxy for winning levels (the further they reach in the level, the better their chances of achieving higher scores). 
+\vspace{-0.4cm}
+
+All three evolved agents outperform the random baseline in all metrics, given that it struggles to complete any level and usually winds up dying early or getting stuck on a wall due to not learning to jump. It also displays high standard deviations across all metrics, as it does not obtain a solidified strategy across individuals, unlike the other tasked agents, which consistently leans toward the variation of the ``run-jump'' strategy that is better suited for its task. The fact that Runner has a considerably higher win rate than Hunter and Thief aligns with the expected behavior: while all incentivize forward progress, Runner directly rewards beating levels. However, Hunter and Thief aren't too behind: their secondary goals appear to serve as an effective proxy for winning levels (the further they reach in the level, the better their chances of more kills/coins). 
+
 For kills and coins, Hunter and Thief outperform Runner in both metrics. We theorize that, due to individuals of the former two tasks tendentially being slower (using the \textsc{Speed} control less), they cover more space and have more opportunities to interact with enemies and coins (thus also dying more frequently to enemy non-kills and pits). Between the two, Hunter is the most effective at utilizing this strategy, even collecting more coins than Thief. This may also be explained by the fact that there is no mapping for coins in the perception grid, essentially meaning it is much harder to optimize for this goal. 
-Table~\ref{tab:winrate_diff} shows a consistent difficulty spike across all tasks: win rates fall from around $65\%$ at $d=0$ to $25\%$ at $d=1$ and $12\%$ at $d=2$. In most cases, the conditional rate exceeds the non-conditional rate, meaning that beating a medium-difficulty level is predictive of beating a hard one. However, for Runner, the conditional rate at $d=2$ is $14.6\%$ against a non-conditional $16.3\%$, a result that is statistically significant (p < 0.05). This may indicate that the additional challenges introduced by $d=2$ compared to $d=1$ may require a slightly different skill set to beat, and that beating $d=1$ is not a reliable predictor of beating $d=2$ when using this strategy.
-\vspace{-1cm}
+
+Table~\ref{tab:winrate_diff} shows a consistent difficulty spike across all tasks: win rates fall from around $65\%$ to $25\%$ and then to $12\%$. In most cases, the conditional rate exceeds the non-conditional rate, meaning that beating the previous level is predictive of beating the current one. However, for Runner, the conditional rate at $d=2$ is $14.6\%$ against a non-conditional $16.3\%$, a result that is statistically significant (p < 0.05). This may indicate that the additional challenges introduced by $d=2$ compared to $d=1$ may require a slightly different skill set to beat, and that beating $d=1$ is not a reliable predictor of beating $d=2$ when using this strategy.
+
+In Table~\ref{tab:pairwise} we make several pairwise comparisons between task types to isolate task-specific gains. The first two comparisons confirm extremely large advantages. The last two show that while Hunter's advantage over Thief on killed enemies is statistically significant, the advantage on coins is not.
+
+\vspace{-0.4cm}
 \begin{table}[htbp]
 \centering
-\caption{Pairwise comparisons of key metrics across evolved agents. Covers mean difference \(\Delta\), 95\% confidence interval for \(\Delta\), Cohen's \(d\), and result of a two-tailed Welch's \(t\)-test \(n = 5\)}
+\caption{Pairwise comparisons of key metrics across agents. Covers mean difference \(\Delta\), 95\% confidence interval for \(\Delta\), Cohen's \(d\), and result of a two-tailed Welch \(t\)-test.}
+\vspace{-0.2cm}
 \label{tab:pairwise}
 \resizebox{\textwidth}{!}{%
 \begin{tabular}{|l|c|c|c|c|c|c|}
@@ -302,22 +312,32 @@ Hunter vs.\ Thief (coins collected)    & 0.67 & [-0.54, 1.88] & 0.90  & 1.42 & 4
 \end{tabular}
 }
 \end{table}
-\vspace{-1cm}
-In Table~\ref{tab:pairwise} we make several pairwise comparisons between task types to isolate task-specific gains. The first two comparisons confirm extremely large advantages. The last two show that while Hunter's advantage over Thief on killed enemies is statistically significant, the advantage on coins is not.
+\vspace{-0.4cm}
+
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=0.65\textwidth]{../../data/search_space_analysis_full_reeval/heatmap_height_vs_mean_and_max_fitness.png}
-  \caption{Mean-fitness heatmap across generations and tree heights. Each cell aggregates individuals of a given height at a given generation, with warmer colors indicating higher fitness.}
+  \caption{Mean-fitness heatmap across generations and tree heights. Each cell aggregates individuals of a given height at a given generation. Warm colors indicate higher fitness.}
   \label{fig:height_mean_fitness_heatmap}
 \end{figure}
+
 Figure~\ref{fig:height_mean_fitness_heatmap} shows that early generations are concentrated at lower heights and mostly poor mean fitness, while from roughly generation 100 onward the population spreads toward medium heights (around 9--13), where better averages appear more consistently. Very tall trees remain sparse and unstable, with occasional good values but no sustained advantage, which is consistent with the idea that moderate structural complexity is sufficient for useful policies while larger trees mainly add variance.
-Hence the importance of bloat control through selection rather than a hard height limit: it allows the population to explore more complex structures while keeping them in check, rather than outright forbidding them.
+Hence the importance of bloat control through selection rather than a hard height limit: it allows the population to explore more complex structures while keeping them in check, rather than forbidding them.
+
 % =============================================================================
 \section{Conclusion}
 \label{sec:conclusion}
-GP over a typed grammar produced controllers that clear levels at 39.3\% across $5{,}000$ held-out seeds, against 0.3\% for random search. Hunter and Thief agents reached 32.2\% and 30.5\% respectively; Hunter led on kills ($0.88$ vs.\ $0.63$ for Runner) and incidentally on coins, though the coin advantage over Thief is not statistically reliable ($p = 0.23$). All three converge on ``run-jump'' variants, with the secondary objective shaping which variant is preferred. The biggest gains came from a small number of decisions: splitting the combined secondary objective into separate tasks, switching to a type-aware kill detector that eliminated false positives from the radius heuristic, and rotating the seed pool every 10 generations to prevent level overfitting without disrupting selection.
+% =============================================================================
 
-The grammar's fixed arity and absence of arithmetic or loops is the main structural limitation: the airtime penalty experiment showed agents cannot evolve a conditional jump policy without richer perceptual primitives. 
+GP over a typed grammar produced controllers that clear levels at 39.3\% across $5{,}000$ held-out seeds, against 0.3\% for random search. Hunter led on kills ($0.88$ vs.\ $0.63$ for Runner) and incidentally on coins, though the coin advantage over Thief is not statistically reliable. All three converge on ``run-jump'' variants, with the secondary objective shaping which variant is preferred. The biggest gains came from a small number of decisions: splitting the combined secondary objective into separate tasks, iterating the kill detector to eliminate false positives from the radius heuristic, and rotating the seed pool every 10 generations to prevent level overfitting without disrupting selection.
+
+The grammar's absence of arithmetic or loops is the main structural limitation: the airtime penalty experiment showed agents struggle to evolve a conditional jump policy without richer perceptual primitives. 
+
+\begingroup
+\renewcommand{\thefootnote}{}
+\footnotetext{\textbf{Note on AI Usage}: Claude assisted in LaTeX formatting and analysis verification.}
+\addtocounter{footnote}{-1}
+\endgroup
 
 \bibliographystyle{splncs04}
 \footnotesize
