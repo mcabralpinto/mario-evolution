@@ -40,6 +40,23 @@ def read_individual_csv(path: Path):
     return by_gen
 
 
+def read_individual_points(path: Path):
+    generations = []
+    heights = []
+    fitness = []
+    with path.open(newline="") as f:
+        reader = csv.DictReader(f)
+        for r in reader:
+            generations.append(float(r["generation"]))
+            heights.append(float(r["tree_height"]))
+            fitness.append(float(r["fitness"]))
+    return (
+        np.array(generations, dtype=float),
+        np.array(heights, dtype=float),
+        np.array(fitness, dtype=float),
+    )
+
+
 def stats_from_individuals(by_gen, generations):
     mean_fit = []
     std_fit = []
@@ -65,29 +82,22 @@ def stats_from_individuals(by_gen, generations):
     )
 
 
-def elite_std_per_generation(by_gen, generations, top_k=10):
-    out = []
-    for g in generations:
-        vals = sorted(by_gen.get(g, []), reverse=True)
-        if not vals:
-            out.append(0.0)
-            continue
-        k = min(top_k, len(vals))
-        elite = vals[:k]
-        out.append(float(np.std(elite)))
-    return np.array(out, dtype=float)
-
-
-def build_split_scale(values, neg_region=0.55, pos_region=0.45):
+def build_split_scale(values, neg_region=0.55, pos_region=0.45, pos_top_override=None):
     arr = np.asarray(values, dtype=float)
     valid = ~np.isnan(arr)
     has_neg = np.any(valid & (arr < 0))
-    has_pos = np.any(valid & (arr > 0))
+    if pos_top_override is None:
+        has_pos = np.any(valid & (arr > 0))
+    else:
+        has_pos = float(pos_top_override) > 0
     if not (has_neg and has_pos):
         return None
 
     neg_bottom = float(np.nanmin(np.concatenate([arr[arr < 0], np.array([0.0])])))
-    pos_top = float(np.nanmax(np.concatenate([arr[arr > 0], np.array([0.0])])))
+    if pos_top_override is None:
+        pos_top = float(np.nanmax(np.concatenate([arr[arr > 0], np.array([0.0])])))
+    else:
+        pos_top = float(pos_top_override)
     neg_span = max(1.0, abs(neg_bottom))
     pos_span = max(1.0, pos_top)
 
@@ -132,26 +142,22 @@ def apply_split_scale_axis(ax, split_scale):
     ax.plot((-d, +d), (y_break - 2 * d, y_break), **kwargs)
 
 
-def plot_mean_max_with_bounds(summary_rows, by_gen, out_path: Path, top_k=10):
+def plot_mean_max_with_bounds(summary_rows, by_gen, out_path: Path):
     gens = np.array([r["generation"] for r in summary_rows], dtype=int)
-    mean_fit, mean_std, max_fit, min_fit = stats_from_individuals(by_gen, gens)
-    max_std = elite_std_per_generation(by_gen, gens, top_k=top_k)
+    mean_fit, mean_std, max_fit, _ = stats_from_individuals(by_gen, gens)
 
-    # Clip spread bands to observed fitness range for each generation.
-    mean_low = np.maximum(mean_fit - mean_std, min_fit)
-    mean_high = np.minimum(mean_fit + mean_std, max_fit)
-    max_low = np.maximum(max_fit - max_std, min_fit)
+    mean_low = mean_fit - mean_std
+    mean_high = mean_fit + mean_std
 
     fig, ax = plt.subplots(figsize=(12, 6.5))
     ax.plot(gens, mean_fit, color="tab:blue", marker="o", linewidth=2.5, label="Mean fitness", zorder=3)
-    ax.fill_between(gens, mean_low, mean_high, color="tab:blue", alpha=0.15, label="Mean ±std (clipped to min/max)", zorder=1)
+    ax.fill_between(gens, mean_low, mean_high, color="tab:blue", alpha=0.15, label="Mean ± std", zorder=1)
 
     ax.plot(gens, max_fit, color="tab:red", marker="s", linewidth=2.5, label="Max fitness", zorder=3)
-    ax.fill_between(gens, max_low, max_fit, color="tab:red", alpha=0.15, label=f"Max spread (top-{top_k} elite std, downward)", zorder=1)
 
     ax.set_xlabel("Generation", fontsize=11)
     ax.set_ylabel("Fitness", fontsize=11)
-    ax.set_title(f"Mean vs max fitness across generations with std bounds", fontsize=12, fontweight="bold")
+    ax.set_title("Mean and Max fitness over generations", fontsize=12, fontweight="bold")
     ax.grid(alpha=0.3, linestyle="--")
     ax.legend(loc="best", fontsize=10)
     fig.tight_layout()
@@ -159,14 +165,12 @@ def plot_mean_max_with_bounds(summary_rows, by_gen, out_path: Path, top_k=10):
     plt.close(fig)
 
 
-def plot_mean_max_dual_axis(summary_rows, by_gen, out_path: Path, top_k=10):
+def plot_mean_max_dual_axis(summary_rows, by_gen, out_path: Path):
     gens = np.array([r["generation"] for r in summary_rows], dtype=int)
-    mean_fit, mean_std, max_fit, min_fit = stats_from_individuals(by_gen, gens)
-    max_std = elite_std_per_generation(by_gen, gens, top_k=top_k)
+    mean_fit, mean_std, max_fit, _ = stats_from_individuals(by_gen, gens)
 
-    mean_low = np.maximum(mean_fit - mean_std, min_fit)
-    mean_high = np.minimum(mean_fit + mean_std, max_fit)
-    max_low = np.maximum(max_fit - max_std, np.nanpercentile(max_fit, 5))
+    mean_low = mean_fit - mean_std
+    mean_high = mean_fit + mean_std
 
     fig, ax1 = plt.subplots(figsize=(12, 6.5))
     ax2 = ax1.twinx()
@@ -174,14 +178,13 @@ def plot_mean_max_dual_axis(summary_rows, by_gen, out_path: Path, top_k=10):
     l1 = ax1.plot(gens, mean_fit, color="tab:blue", marker="o", linewidth=2.2, label="Mean fitness", zorder=3)
     ax1.fill_between(gens, mean_low, mean_high, color="tab:blue", alpha=0.14, zorder=1)
     l2 = ax2.plot(gens, max_fit, color="tab:red", marker="s", linewidth=2.2, label="Max fitness", zorder=3)
-    ax2.fill_between(gens, max_low, max_fit, color="tab:red", alpha=0.14, zorder=1)
 
     ax1.set_xlabel("Generation", fontsize=11)
     ax1.set_ylabel("Mean fitness", fontsize=11, color="tab:blue")
     ax2.set_ylabel("Max fitness", fontsize=11, color="tab:red")
     ax1.tick_params(axis="y", labelcolor="tab:blue")
     ax2.tick_params(axis="y", labelcolor="tab:red")
-    ax1.set_title("Mean and max fitness across generations (dual-axis view)", fontsize=12, fontweight="bold")
+    ax1.set_title("Mean and Max fitness over generations", fontsize=12, fontweight="bold")
     ax1.grid(alpha=0.3, linestyle="--")
 
     lines = l1 + l2
@@ -191,38 +194,34 @@ def plot_mean_max_dual_axis(summary_rows, by_gen, out_path: Path, top_k=10):
     plt.close(fig)
 
 
-def plot_max_fitness_line(summary_rows, by_gen, out_path: Path, top_k=10):
+def plot_max_fitness_line(summary_rows, by_gen, out_path: Path):
     gens = np.array([r["generation"] for r in summary_rows], dtype=int)
-    mean_fit, mean_std, max_fit, min_fit = stats_from_individuals(by_gen, gens)
-    max_std = elite_std_per_generation(by_gen, gens, top_k=top_k)
-    mean_low = np.maximum(mean_fit - mean_std, min_fit)
-    mean_high = np.minimum(mean_fit + mean_std, max_fit)
-    max_low = np.maximum(max_fit - max_std, min_fit)
+    mean_fit, mean_std, max_fit, _ = stats_from_individuals(by_gen, gens)
+    mean_low = mean_fit - mean_std
+    mean_high = mean_fit + mean_std
 
     fig, ax = plt.subplots(figsize=(11, 6.8))
-    split_values = np.concatenate([mean_low, mean_high, max_low, max_fit])
-    split_scale = build_split_scale(split_values)
+    split_values = np.concatenate([mean_low, mean_high, max_fit])
+    split_scale = build_split_scale(split_values, pos_top_override=float(np.nanmax(max_fit)))
 
     if split_scale is not None:
         t = split_scale["transform"]
         ax.plot(gens, t(mean_fit), color="tab:blue", marker="o", linewidth=2.4, label="Mean fitness", zorder=3)
-        ax.fill_between(gens, t(mean_low), t(mean_high), color="tab:blue", alpha=0.15, label="Mean ±std (clipped to min/max)", zorder=1)
+        ax.fill_between(gens, t(mean_low), t(mean_high), color="tab:blue", alpha=0.15, label="Mean ± std", zorder=1)
         ax.plot(gens, t(max_fit), color="tab:red", marker="s", linewidth=2.4, label="Max fitness", zorder=3)
-        ax.fill_between(gens, t(max_low), t(max_fit), color="tab:red", alpha=0.15, label=f"Max spread (top-{top_k} elite std, downward)", zorder=1)
         apply_split_scale_axis(ax, split_scale)
         fig.suptitle(
-            f"Mean and max fitness per generation (single plot with split y-scale at 0)\nStd bounds shown for both mean and max",
+            "Mean and Max fitness over generations",
             fontsize=12,
             fontweight="bold",
         )
     else:
         ax.plot(gens, mean_fit, color="tab:blue", marker="o", linewidth=2.4, label="Mean fitness", zorder=3)
-        ax.fill_between(gens, mean_low, mean_high, color="tab:blue", alpha=0.15, label="Mean ±std (clipped to min/max)", zorder=1)
+        ax.fill_between(gens, mean_low, mean_high, color="tab:blue", alpha=0.15, label="Mean ± std", zorder=1)
         ax.plot(gens, max_fit, color="tab:red", marker="s", linewidth=2.4, label="Max fitness", zorder=3)
-        ax.fill_between(gens, max_low, max_fit, color="tab:red", alpha=0.15, label=f"Max spread (top-{top_k} elite std, downward)", zorder=1)
         ax.axhline(0.0, color="black", linestyle="--", linewidth=1.2, alpha=0.8)
         fig.suptitle(
-            f"Mean and max fitness per generation\nStd bounds shown for both mean and max",
+            "Mean and Max fitness over generations",
             fontsize=12,
             fontweight="bold",
         )
@@ -279,6 +278,47 @@ def plot_colored_height_relationship(summary_rows, out_path: Path):
     plt.close(fig)
 
 
+def plot_colored_height_relationship_heatmap(individual_data, out_path: Path):
+    gens, heights, fitness = individual_data
+    unique_gens = np.unique(gens)
+
+    if unique_gens.size == 1:
+        gen_edges = np.array([unique_gens[0] - 0.5, unique_gens[0] + 0.5], dtype=float)
+    else:
+        mids = (unique_gens[:-1] + unique_gens[1:]) / 2.0
+        left = unique_gens[0] - (mids[0] - unique_gens[0])
+        right = unique_gens[-1] + (unique_gens[-1] - mids[-1])
+        gen_edges = np.concatenate([[left], mids, [right]]).astype(float)
+
+    h_min = float(heights.min())
+    h_max = float(heights.max())
+    if h_min == h_max:
+        h_min -= 0.5
+        h_max += 0.5
+    n_h = max(8, min(32, int(np.unique(heights).size)))
+    h_edges = np.linspace(h_min, h_max, n_h + 1)
+
+    weighted_sum, _, _ = np.histogram2d(gens, heights, bins=[gen_edges, h_edges], weights=fitness)
+    counts, _, _ = np.histogram2d(gens, heights, bins=[gen_edges, h_edges])
+    mean_grid = np.full_like(weighted_sum, np.nan, dtype=float)
+    np.divide(weighted_sum, counts, out=mean_grid, where=counts > 0)
+    mean_grid = mean_grid.T
+
+    fig, ax = plt.subplots(figsize=(8.5, 5.5), constrained_layout=True)
+    m = ax.pcolormesh(gen_edges, h_edges, mean_grid, shading="auto", cmap="viridis")
+
+    ax.set_title("Mean fitness heatmap", fontsize=12, fontweight="bold")
+    ax.set_xlabel("Generation", fontsize=11)
+    ax.set_ylabel("Tree height", fontsize=11)
+    ax.grid(alpha=0.2, linestyle="--")
+
+    cbar = fig.colorbar(m, ax=ax, location="right")
+    cbar.set_label("Fitness", fontsize=10)
+    fig.suptitle("Height vs mean fitness over generations (heatmap)", fontsize=13, fontweight="bold")
+    fig.savefig(out_path, dpi=180, bbox_inches="tight")
+    plt.close(fig)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Plot requested charts from reevaluation CSVs.")
     parser.add_argument(
@@ -296,12 +336,6 @@ def main():
         type=Path,
         default=Path("data/search_space_analysis_full_reeval"),
     )
-    parser.add_argument(
-        "--elite-k",
-        type=int,
-        default=10,
-        help="Top-k individuals per generation used to estimate max-fitness std bound.",
-    )
     args = parser.parse_args()
 
     args.outdir.mkdir(parents=True, exist_ok=True)
@@ -312,16 +346,20 @@ def main():
     plot2 = args.outdir / "colored_comparison_height_vs_mean_and_max_fitness.png"
     plot3 = args.outdir / "line_mean_vs_max_fitness_dual_axis.png"
     plot4 = args.outdir / "line_max_fitness_from_individual_csv.png"
+    plot5 = args.outdir / "heatmap_height_vs_mean_and_max_fitness.png"
 
-    plot_mean_max_with_bounds(summary_rows, by_gen, plot1, top_k=args.elite_k)
+    plot_mean_max_with_bounds(summary_rows, by_gen, plot1)
     plot_colored_height_relationship(summary_rows, plot2)
-    plot_mean_max_dual_axis(summary_rows, by_gen, plot3, top_k=args.elite_k)
-    plot_max_fitness_line(summary_rows, by_gen, plot4, top_k=args.elite_k)
+    plot_mean_max_dual_axis(summary_rows, by_gen, plot3)
+    plot_max_fitness_line(summary_rows, by_gen, plot4)
+    individual_data = read_individual_points(args.individual_csv)
+    plot_colored_height_relationship_heatmap(individual_data, plot5)
 
     print(f"Saved: {plot1}")
     print(f"Saved: {plot2}")
     print(f"Saved: {plot3}")
     print(f"Saved: {plot4}")
+    print(f"Saved: {plot5}")
 
 
 if __name__ == "__main__":

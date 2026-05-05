@@ -1,0 +1,24 @@
+Full reevaluation summary (all individuals, all seed checkpoints)
+========================================================================
+checkpoints: 30
+individuals: 3000
+generations: 10..299
+fitness min/max/mean: -8225100.000 / 51345.326 / -3130567.565
+size min/max/mean: 4.0 / 242.0 / 55.4
+height min/max/mean: 2.0 / 20.0 / 8.1
+uniqueness ratio min/max/mean: 58.00% / 99.00% / 83.17%
+token diversity min/max/mean: 0.2374 / 0.7865 / 0.5064
+cumulative unique trees at end: 1840
+
+Generated files:
+- generation_summary_full_reeval.csv
+- heatmap_generation_vs_tree_height_mean_fitness.png
+- heatmap_generation_vs_tree_size_mean_fitness.png
+- hexbin_size_height_mean_fitness_full.png
+- individual_metrics_full_reeval.csv
+- line_cumulative_unique_trees_full.png
+- line_uniqueness_and_fitness_full.png
+- scatter_fitness_vs_tree_height_full.png
+- scatter_fitness_vs_tree_size_full.png
+- scatter_max_fitness_vs_diversity_full.png
+- summary_full_reeval.txt

@@ -1,0 +1,164 @@
+{
+  "runs": [
+    {
+      "task": "hunter",
+      "timestamp": "2026-05-04T20:23:45.151096",
+      "agents": {
+        "hunter_seed_30000": {
+          "win_rate": 0.328,
+          "avg_progress": 952.8125452904474,
+          "avg_kills": 0.9254666666666667,
+          "avg_coins": 9.3624,
+          "win_rate_per_diff": {
+            "0": 0.6414,
+            "1": 0.238,
+            "2": 0.1046
+          },
+          "conditional_win_rate_per_diff": {
+            "0": 0.6414,
+            "1": 0.2488306828811974,
+            "2": 0.13909774436090225
+          }
+        },
+        "hunter_seed_30001": {
+          "win_rate": 0.31506666666666666,
+          "avg_progress": 931.6962541279821,
+          "avg_kills": 0.8424666666666667,
+          "avg_coins": 10.013866666666667,
+          "win_rate_per_diff": {
+            "0": 0.6388,
+            "1": 0.2216,
+            "2": 0.0848
+          },
+          "conditional_win_rate_per_diff": {
+            "0": 0.6388,
+            "1": 0.22886662492172824,
+            "2": 0.10807113543091655
+          }
+        }
+      },
+      "summary": {
+        "win_rate": {
+          "mean": 0.32153333333333334,
+          "std": 0.006466666666666676
+        },
+        "avg_progress": {
+          "mean": 942.2543997092148,
+          "std": 10.558145581232623
+        },
+        "avg_kills": {
+          "mean": 0.8839666666666667,
+          "std": 0.04149999999999998
+        },
+        "avg_coins": {
+          "mean": 9.688133333333333,
+          "std": 0.3257333333333339
+        }
+      }
+    },
+    {
+      "task": "random",
+      "timestamp": "2026-05-05T01:01:26.893269",
+      "agents": {
+        "random_seed_30000": {
+          "win_rate": 0.0,
+          "avg_progress": 32.0,
+          "avg_kills": 0.0,
+          "avg_coins": 0.0,
+          "win_rate_per_diff": {
+            "0": 0.0,
+            "1": 0.0,
+            "2": 0.0
+          },
+          "conditional_win_rate_per_diff": {
+            "0": 0.0,
+            "1": 0.0,
+            "2": 0.0
+          }
+        },
+        "random_seed_30001": {
+          "win_rate": 0.0,
+          "avg_progress": 32.0,
+          "avg_kills": 0.0,
+          "avg_coins": 0.0,
+          "win_rate_per_diff": {
+            "0": 0.0,
+            "1": 0.0,
+            "2": 0.0
+          },
+          "conditional_win_rate_per_diff": {
+            "0": 0.0,
+            "1": 0.0,
+            "2": 0.0
+          }
+        },
+        "random_seed_30002": {
+          "win_rate": 0.0,
+          "avg_progress": 32.0,
+          "avg_kills": 0.0,
+          "avg_coins": 0.0,
+          "win_rate_per_diff": {
+            "0": 0.0,
+            "1": 0.0,
+            "2": 0.0
+          },
+          "conditional_win_rate_per_diff": {
+            "0": 0.0,
+            "1": 0.0,
+            "2": 0.0
+          }
+        },
+        "random_seed_30003": {
+          "win_rate": 0.0,
+          "avg_progress": 32.0,
+          "avg_kills": 0.0,
+          "avg_coins": 0.0,
+          "win_rate_per_diff": {
+            "0": 0.0,
+            "1": 0.0,
+            "2": 0.0
+          },
+          "conditional_win_rate_per_diff": {
+            "0": 0.0,
+            "1": 0.0,
+            "2": 0.0
+          }
+        },
+        "random_seed_30004": {
+          "win_rate": 0.0,
+          "avg_progress": 32.0,
+          "avg_kills": 0.0,
+          "avg_coins": 0.0,
+          "win_rate_per_diff": {
+            "0": 0.0,
+            "1": 0.0,
+            "2": 0.0
+          },
+          "conditional_win_rate_per_diff": {
+            "0": 0.0,
+            "1": 0.0,
+            "2": 0.0
+          }
+        }
+      },
+      "summary": {
+        "win_rate": {
+          "mean": 0.0,
+          "std": 0.0
+        },
+        "avg_progress": {
+          "mean": 32.0,
+          "std": 0.0
+        },
+        "avg_kills": {
+          "mean": 0.0,
+          "std": 0.0
+        },
+        "avg_coins": {
+          "mean": 0.0,
+          "std": 0.0
+        }
+      }
+    }
+  ]
+}
