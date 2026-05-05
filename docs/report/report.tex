@@ -326,32 +326,20 @@ Hunter vs.\ Thief (coins collected)    & 0.67 & [-0.54, 1.88] & 0.90  & 1.42 & 4
 
 In Table~\ref{tab:pairwise} we make several pairwise comparisons between task types to isolate task-specific gains. The first two comparisons confirm extremely large advantages. The last two show that while Hunter's advantage over Thief on killed enemies is statistically significant, the advantage on coins is not.
 
-% \subsection{Qualitative Analysis of Evolved Behavior}
+\vspace{-0.5cm}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.72\textwidth]{../../data/search_space_analysis_full_reeval/heatmap_height_vs_mean_and_max_fitness.png}
+  \caption{Mean-fitness heatmap across generations and tree heights. Each cell aggregates individuals of a given height at a given generation, with warmer colors indicating higher fitness.}
+  \label{fig:height_mean_fitness_heatmap}
+\end{figure}
+\vspace{-0.5cm}
 
-% The random baseline produces no wins because stochastic action sequences cannot maintain the forward movement needed to clear a level: the agent will occasionally press right or jump, but without any coordinated structure these actions are quickly stopped by an obstacle or enemy, leaving Mario stuck.
+Figure~\ref{fig:height_mean_fitness_heatmap} shows that early generations are concentrated at lower heights and mostly poor mean fitness, while from roughly generation 100 onward the population spreads toward medium heights (around 9--13), where better averages appear more consistently. Very tall trees remain sparse and unstable, with occasional good values but no sustained advantage, which is consistent with the idea that moderate structural complexity is sufficient for useful policies while larger trees mainly add variance.
+Hence the importance of bloat control through selection rather than a hard height limit: it allows the population to explore more complex structures while keeping them in check, rather than outright forbidding them.
 
-% The best Runner individual found is a compact controller:
 
-% \begin{small}
-% \begin{verbatim}
-% action[KEY_RIGHT] = 1
-% if (can_jump or (on_ground or can_jump)):
-%     if can_jump:
-%         action[KEY_JUMP] = 1
-%     else:
-%         action[KEY_RIGHT] = 0
-% else:
-%     action[KEY_JUMP] = 1
-% if (enemies[11+-3][11+-1] <= 3) and (landscape[11+-3][11+2] != -10):
-%     action[KEY_SPEED] = 1
-% \end{verbatim}
-% \end{small}
 
-% The first statement sets \textsc{Right} unconditionally. The jump condition \texttt{can\_jump or (on\_ground or can\_jump)} simplifies to \texttt{can\_jump or on\_ground}, which holds on almost every ground-level frame, so the agent jumps on every step it is able to and briefly releases \textsc{Right} on landing frames. The speed condition checks for a low-threat sprite ($\leq 3$, Goomba variants) three cells behind Mario with no hard obstacle at the same offset; since the offset points behind Mario, this branch fires on largely empty terrain and amounts to a near-unconditional speed boost. The result is an agent that runs right and jumps on every available frame, clearing most obstacles and pits without any explicit lookahead.
-
-% The failure mode follows from the same design: the jump fires on \texttt{can\_jump} alone, without checking whether a pit lies ahead. On higher difficulties, where pits are more frequent and enemies more dense, the agent frequently launches itself into gaps it could have avoided, which accounts for the sharp drop in win rate from $d=0$ to $d=2$.
-
-% The Hunter and Thief champions are larger programs that retain the same run-right core but add conditional blocks that activate \textsc{Speed} or \textsc{Jump} based on enemy type codes and terrain values at specific offsets. In the Thief champion, an unconditional \texttt{KEY\_LEFT = 1} statement fires on every ground-contact frame, producing occasional left-stepping on landings; this is a structural intron that parsimony pressure did not remove, since its node cost fell below the tournament threshold. Neither program encodes an explicit kill or coin-seeking path: the secondary objective scores come from the forward progress these agents make through levels where enemies and coins happen to lie on the route.
 
 % =============================================================================
 \section{Conclusion}
@@ -362,7 +350,7 @@ GP over a typed grammar produced controllers that clear levels at 39.3\% across 
 
 The grammar's fixed arity and absence of arithmetic or loops is the main structural limitation: the airtime penalty experiment showed agents cannot evolve a conditional jump policy without richer perceptual primitives. 
 
-
+\small
 \bibliographystyle{splncs04}
 \bibliography{references}
 
