@@ -541,8 +541,8 @@ if __name__ == "__main__":
         print(f"Starting Random-Checkpoint Search: {len(checkpoint_gens)} checkpoint(s) "
               f"at gens {checkpoint_gens}, Population size {args.pop}")
 
-        hof = tools.HallOfFame(1)
         gen = -1
+        last_pop, last_hof, last_seed_pool = None, None, None
         try:
             for gen in checkpoint_gens:
                 print(f"\n--- Checkpoint Generation {gen} ---")
@@ -559,21 +559,24 @@ if __name__ == "__main__":
                 for ind, fit in zip(pop, fitnesses):
                     ind.fitness.values = (fit,)
 
-                hof.update(pop)
+                # Fresh HOF per checkpoint so each saves its own best individual
+                gen_hof = tools.HallOfFame(1)
+                gen_hof.update(pop)
                 record = stats.compile(pop)
                 print(f"\033[91mMax:\033[0m {record['max']:.3f}, \033[94mMin:\033[0m {record['min']:.3f}, "
                       f"\033[92mAvg:\033[0m {record['avg']:.3f}, \033[93mStd:\033[0m {record['std']:.3f}")
 
                 Path("data/seed_checkpoints").mkdir(parents=True, exist_ok=True)
-                save_checkpoint(pop, hof, gen, args, seed_pool,
+                save_checkpoint(pop, gen_hof, gen, args, seed_pool,
                                 filepath=f"data/seed_checkpoints/checkpoint_gen_{gen}.pkl")
+                last_pop, last_hof, last_seed_pool = pop, gen_hof, seed_pool
 
         except KeyboardInterrupt:
             print("\nInterrupted.")
         finally:
             terminate_evaluation_pool()
-            if gen >= 0:
-                save_checkpoint(pop, hof, gen, args, seed_pool)
+            if last_pop is not None:
+                save_checkpoint(last_pop, last_hof, gen, args, last_seed_pool)
 
     else:
         print(f"Starting Evolution: {NGEN} generations, Population size {args.pop}")
